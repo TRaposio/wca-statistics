@@ -6,7 +6,7 @@ If you want to download the WCA database, you can find it [here](https://www.wor
 ## Python
 In the Jupyter notebook you will find a collection of statistics with a focus on the Italian speedcubing community.
 
-<br><br><img src="misc/ItalianCubers.png" width=750><br><br>
+<br><br><img src="misc/ItalianCubers.png" width=750 background = "white"><br><br>
 <br><br><img src="misc/NRevol.png" width=750><br><br>
 <br><br><img src="misc/WCADistribution.png" width=750><br><br>
 
