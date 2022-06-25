@@ -1,9 +1,3 @@
-<style>
-img {
-  background-color: #FFFFFF;
-}
-</style>
-
 # wca-statistics
 A collection of statistics regarding WCA competitions
 
