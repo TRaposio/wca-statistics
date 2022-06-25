@@ -2,7 +2,7 @@
 A collection of statistics regarding WCA competitions
 
 ## Speedsolving
-The goal of speed solving is to solve the Rubik's Cube (and similar puzzles) as fast as possible. Most speed solvers are able to do this in under 20 seconds and compete regularly against each other. I am a speed solver myself and a World Cube Association <i>Delegate</i> for Italy.
+The goal of <i>speedsolving</i> is to solve the Rubik's Cube (and similar puzzles) as fast as possible. Most speed solvers are able to do this in under 20 seconds and compete regularly against each other. I am a speed solver myself and a World Cube Association <i>Delegate</i> for Italy.
 
 The World Cube Association (WCA)[^1] organizes and regulates speedsolving competitions all around the world, with the aim of providing more fun for more people under fair and equal conditions. All the official times achieved at competitions are posted on leaderboards and are publicly available at any time.
 
@@ -11,9 +11,10 @@ If you want to download the WCA database, you can find it [here](https://www.wor
 ## Python
 In the Jupyter notebooks you will find:
 - a collection of statistics with a focus on the Italian speedcubing community.
-- code for calculating the longest streak of competitions with a personal record for each competitor.
+- code for calculating the longest (ongoing) streak of competitions with a personal record for each competitor.
 
-These are a few examples
+These are a few examples:
+
 <br><img src="misc/ITcubers.jpg" width=550><br>
 <br><img src="misc/NRevolution.jpg" width=550><br>
 <br><img src="misc/WCACDistribution.jpg" width=550><br>
