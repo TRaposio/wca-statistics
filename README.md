@@ -1,10 +1,17 @@
 # wca-statistics
 A collection of statistics regarding WCA competitions
 
-## SQL
 If you want to download the WCA database, you can find it [here](https://www.worldcubeassociation.org/results/misc/export.html).
 
-If you own a WCA[^1] account, you can also visit the [statistics.worldcubeassociation.org](https://statistics.worldcubeassociation.org/) website[^2] and either compute your own queries or use one of mine from this repository. 
+## Python
+In the Jupyter notebook you will find a collection of statistics with a focus on the Italian speedcubing community.
+
+<br><br><img src="misc/ItalianCubers.png" width=750><br><br>
+<br><br><img src="misc/NRevol.png" width=750><br><br>
+<br><br><img src="misc/WCADistribution.png" width=750><br><br>
+
+## SQL
+If you own a WCA[^1] account, you can visit the [statistics.worldcubeassociation.org](https://statistics.worldcubeassociation.org/) website[^2] and either compute your own queries or use one of mine from this repository. 
 
 - Log into the WCA account
 - Go to the *Database Query* section
