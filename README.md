@@ -27,7 +27,7 @@ If you own a WCA account, you can visit the [statistics.worldcubeassociation.org
 - Copy and paste the code from the desired query
 - submit!
 
-<br><img src="misc/query_example.png" width=750><br>
+<br><img src="misc/query_example.png" width=550><br>
 
 [^1]: [World Cube Association](https://www.worldcubeassociation.org/)
 [^2]: Thank you [WCA Software Team](https://www.worldcubeassociation.org/teams-committees)!
