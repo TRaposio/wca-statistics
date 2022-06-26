@@ -18,14 +18,7 @@ In the Jupyter Notebooks you will find:
 
 - A notebook that generates an interactive map of the my WCA Competitions.
 
-<iframe src="wca-statistics/Python/CompMap2014RAPO01.html"
-    sandbox="allow-same-origin allow-scripts"
-    width="100%"
-    height="500"
-    scrolling="no"
-    seamless="seamless"
-    frameborder="0">
-</iframe>
+<br><img src="misc/CompMap.jpg" width=550><br>
 
 - A notebook that generates the longest (ongoing) streak of competitions with a personal record for each competitor.
 
