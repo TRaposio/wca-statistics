@@ -9,15 +9,25 @@ The World Cube Association (WCA)[^1] organizes and regulates speedsolving compet
 If you want to download the WCA database, you can find it [here](https://www.worldcubeassociation.org/results/misc/export.html).
 
 ## Python
-In the Jupyter notebooks you will find:
-- a collection of statistics with a focus on the Italian speedcubing community.
-- code for calculating the longest (ongoing) streak of competitions with a personal record for each competitor.
-
-These are a few examples:
+In the Jupyter Notebooks you will find:
+- A collection of statistics with a focus on the Italian speedcubing community. These are a few examples:
 
 <br><img src="misc/ITcubers.jpg" width=550><br>
 <br><img src="misc/NRevolution.jpg" width=550><br>
 <br><img src="misc/WCACDistribution.jpg" width=550><br>
+
+- A notebook that generates an interactive map of the my WCA Competitions.
+
+<iframe src="wca-statistics/Python/CompMap2014RAPO01.html"
+    sandbox="allow-same-origin allow-scripts"
+    width="100%"
+    height="500"
+    scrolling="no"
+    seamless="seamless"
+    frameborder="0">
+</iframe>
+
+- A notebook that generates the longest (ongoing) streak of competitions with a personal record for each competitor.
 
 ## SQL
 If you own a WCA account, you can visit the [statistics.worldcubeassociation.org](https://statistics.worldcubeassociation.org/) website[^2] and either compute your own queries or use one of mine from this repository. 
