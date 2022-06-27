@@ -13,7 +13,7 @@ In the Jupyter Notebooks you will find:
 - A collection of statistics with a focus on the Italian speedcubing community. These are a few examples:
 
 <img src="misc/ITcubers.jpg" width=550>
-<br><img src="misc/NRevolution.jpg" width=550><br>
+<br><img src="misc/record_evol.jpg" width=550><br>
 <img src="misc/WCACDistribution.jpg" width=550><br>
 
 - A notebook that generates an interactive map of my WCA Competitions (with a few examples, 2003BRUC01 is by far the best one).
