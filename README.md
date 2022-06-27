@@ -16,9 +16,9 @@ In the Jupyter Notebooks you will find:
 <br><img src="misc/NRevolution.jpg" width=550><br>
 <img src="misc/WCACDistribution.jpg" width=550><br>
 
-- A notebook that generates an interactive map of my WCA Competitions.
+- A notebook that generates an interactive map of my WCA Competitions (with a few examples, 2003BRUC01 is by far the best one).
 
-<img src="misc/CompMap.jpg" width=550>
+<img src="misc/Comp_map.jpg" width=550>
 
 - A notebook that generates the longest (ongoing) streak of competitions with a personal record for each competitor.
 
