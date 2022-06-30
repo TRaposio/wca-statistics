@@ -14,7 +14,7 @@ In the Jupyter Notebooks you will find:
 
 <img src="misc/ITcubers.jpg" width=550>
 <br><img src="misc/record_evol.jpg" width=550><br>
-<img src="misc/WCACDistribution.jpg" width=550><br>
+<img src="misc/Distribution.jpg" width=550><br>
 
 - A notebook that generates an interactive map of my WCA Competitions (with a few examples, 2003BRUC01 is by far the best one).
 
