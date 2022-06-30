@@ -22,6 +22,7 @@ In the Jupyter Notebooks you will find:
 
 - A notebook that generates the longest (ongoing) streak of competitions with a personal record for each competitor.
 - A notebook that generates the list of world records if only the nth best result from each competitor counted for the rankings.
+- A notebook that generates statistics related to the number of completed solves at WCA competitions
 
 ## SQL
 If you own a WCA account, you can visit the [statistics.worldcubeassociation.org](https://statistics.worldcubeassociation.org/) website[^2] and either compute your own queries or use one of mine from this repository. 
