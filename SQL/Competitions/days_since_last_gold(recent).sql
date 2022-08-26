@@ -24,7 +24,7 @@ FROM (
 			WHERE 
 				r2.competitionId = c2.id AND
 				r2.countryId = 'Italy' AND
-				c.year > 2017
+				c2.year > 2021
 			)
 	GROUP BY 
 		r.personId
