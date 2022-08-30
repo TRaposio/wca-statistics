@@ -1,6 +1,6 @@
 SELECT 
 	eventId, 
-	COUNT(eventId)/17 as GTS
+	ROUND(COUNT(eventId)/100,2) as GTS
 FROM (
 	SELECT 
 		personId as id, 
@@ -11,7 +11,7 @@ FROM (
 		worldRank <= 100 AND 
 		eventId NOT IN ('magic','mmagic','333ft','333mbo')
 	GROUP BY personId
-	HAVING COUNT(worldRank) = 1) p
+	HAVING COUNT(eventId) = 1) p
 GROUP BY 
 	eventId
 ORDER BY 
