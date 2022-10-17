@@ -1,3 +1,5 @@
+# Number of times name x was the most common name at a competition
+
 SELECT 
 	w.name, 
 	COUNT(*) as freq
