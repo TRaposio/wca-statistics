@@ -1,20 +1,20 @@
-SELECT *
+SELECT 
+        q.countryId, 
+        wca_statistics_time_format(q.mean, q.eventId, 'average') as Nth_average
 FROM 
 	(SELECT 
 		p.countryId, 
-		r.best as mean, 
+		r.best as mean,
+                r.eventId, 
 		RANK() OVER (PARTITION BY p.countryId ORDER BY r.id ASC) as truerank
 	FROM 
-		RanksAverage r
-	JOIN 
-		Persons p
-	ON 
-		r.personId = p.id
+		RanksAverage r, Persons p
 	WHERE 
-		r.eventId = '333fm' AND 
+		r.personId = p.id AND 
+        r.eventId = ':event' AND
 		p.subid = 1
 	) q
 WHERE 
-	q.truerank = 10
+	q.truerank = :N
 ORDER BY 
 	q.mean ASC
