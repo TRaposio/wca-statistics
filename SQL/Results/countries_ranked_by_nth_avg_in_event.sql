@@ -6,7 +6,7 @@ FROM
 		p.countryId, 
 		r.best as mean,
                 r.eventId, 
-		RANK() OVER (PARTITION BY p.countryId ORDER BY r.id ASC) as truerank
+		RANK() OVER (PARTITION BY p.countryId ORDER BY r.worldRank, r.personId ASC) as truerank
 	FROM 
 		RanksAverage r, Persons p
 	WHERE 
