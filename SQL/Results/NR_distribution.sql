@@ -34,7 +34,7 @@ WHERE
 GROUP BY 
 	t.personId
 ORDER BY 
-	t.NRs DESC
+	NRs DESC
 
 
 # Super long and dumb code, outer joins were necessary to simulate a full
