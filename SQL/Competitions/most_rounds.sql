@@ -1,3 +1,5 @@
+# Ranks competitors by their cumulative number of rounds #
+
 SELECT 
 	p.personId as Id, 
 	personName as Name, 
