@@ -16,7 +16,7 @@ In the Jupyter Notebooks you will find:
 <br><img src="misc/record_evol.jpg" width=550><br>
 <img src="misc/Distribution.jpg" width=550><br>
 
-- A notebook that generates an interactive map of my WCA Competitions (with a few examples, 2003BRUC01 is by far the best one).
+- A notebook that generates an interactive map of my WCA Competitions (with an example).
 
 <img src="misc/Comp_map.jpg" width=550>
 
