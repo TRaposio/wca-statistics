@@ -1,3 +1,5 @@
+/* Italians with no medals ranked by number of finals they qualified for (no combined finals) */
+
 SELECT 
 	personId as WCAID,
 	personName as Name,
@@ -6,7 +8,7 @@ FROM
 	Results
 WHERE 
 	countryId = 'Italy' AND 
-	roundTypeId IN ('f','c') AND 
+	roundTypeId ='f' AND 
 	best > 0
 GROUP BY 
 	personId
