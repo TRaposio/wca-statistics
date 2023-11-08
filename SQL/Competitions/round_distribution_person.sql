@@ -12,8 +12,8 @@ FROM
 	ON 
 		r.competitionId = c.id
 	WHERE 
-		r.personId = '2017DUMM01' AND 
-		year = 2022
+		r.personId = ':wca_id' AND 
+		RIGHT(c.id,4) = :year
 	GROUP BY 
 		eventId, 
 		competitionId)p
