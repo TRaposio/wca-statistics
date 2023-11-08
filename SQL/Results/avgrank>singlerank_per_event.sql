@@ -1,6 +1,8 @@
+/* fraction of competitors that have a better single world ranking than average world ranking for each event */
+
 SELECT 
 	s.eventId as Event,
-	SUM(IF(a.worldRank<=s.worldRank, 1, 0))/ COUNT(DISTINCT(s.personId)) as 'avg>single_pct'
+	SUM(IF(a.worldRank<=s.worldRank, 1, 0))/ COUNT(DISTINCT(s.personId)) as 'single>avg_pct'
 FROM 
 	RanksSingle s
 LEFT JOIN 
