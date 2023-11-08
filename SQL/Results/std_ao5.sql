@@ -1,3 +1,5 @@
+/* Italian 3x3 average ranked by ascending standard deviation */
+
 SELECT
    competitionId as Competition,
    personId as WCAID, 
