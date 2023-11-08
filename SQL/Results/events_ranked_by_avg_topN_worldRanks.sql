@@ -7,15 +7,16 @@ SELECT
 FROM 
 	(SELECT 
 		p.countryId, 
-    	r.eventId,
-    	r.worldRank, 
+    		r.eventId,
+    		r.worldRank, 
 		RANK() OVER (PARTITION BY r.eventId ORDER BY r.worldRank, r.personId ASC) as truerank
 	FROM 
 		RanksAverage r, Persons p
 	WHERE 
-		r.personId = p.id AND 
+		r.personId = p.wca_id AND 
 		p.subid = 1 AND
-		p.countryId = ':country'
+		p.countryId = ':country' AND
+		r.eventId NOT IN ('magic','mmagic','333ft','333mbo')
 	) q
 WHERE 
 	q.truerank <= :N
