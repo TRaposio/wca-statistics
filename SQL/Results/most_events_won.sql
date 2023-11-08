@@ -1,3 +1,5 @@
+/* Italians ranked by number of wca events won (past and present) */
+
 SELECT 
 	t.personId as WCAID,
 	t.personName as Name,
@@ -6,9 +8,10 @@ SELECT
 FROM 
 	Results t
 WHERE 
-	(t.roundTypeId IN ('f','c') AND 
+	t.roundTypeId IN ('f','c') AND 
 	t.CountryId = 'Italy' AND 
-	t.pos = 1AND t.best > 0
+	t.pos = 1 AND 
+	t.best > 0
 GROUP BY 
 	t.personId
 ORDER BY 
