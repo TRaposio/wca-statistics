@@ -70,7 +70,7 @@ FROM (
 		Competitions k
 	WHERE 
 		k.countryId = 'Italy' AND 
-		k.cancelled_at IS NULL AND 
+		k.cancelled_at IS NULL 
 	ORDER BY 
 		date DESC
 	) t
