@@ -1,18 +1,18 @@
+/* Italians listed by date of their first gold medal */
+
 SELECT 
 	personId, 
 	personName, 
-	MIN(CONCAT(c.year,'-',LPAD(c.month,2,0),'-',LPAD(c.day,2,0))) 
+	MIN(c.end_date) as first_win
 FROM 
-	Results r 
-JOIN 
-	Competitions c 
-ON 
-	c.id=r.competitionId 
+	Results r,
+        Competitions c 
 WHERE 
+	r.competitionId = c.id AND
 	r.best > 0 AND 
 	r.pos=1 AND 
 	r.roundTypeId IN ('c','f') AND 
-	r.countryId="Italy"  
+	r.countryId = "Italy"   
 GROUP BY 
 	r.personId, 
 	r.personName 
