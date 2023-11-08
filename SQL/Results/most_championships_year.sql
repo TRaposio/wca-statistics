@@ -1,17 +1,17 @@
 SELECT 
 	r.personId, 
 	r.personName as name, 
-	c.year, 
+	RIGHT(c.id,4) as year, 
 	COUNT(DISTINCT r.competitionId) as championships
 FROM 
 	Results r, 
 	Competitions c,
-    championships s
+    	championships s
 WHERE 
 	r.competitionId = c.id AND
-    s.competition_id = c.id
+    	s.competition_id = c.id
 GROUP BY 
 	r.personid, 
-	c.year
+	RIGHT(c.id,4)
 ORDER BY 
 	4 DESC
