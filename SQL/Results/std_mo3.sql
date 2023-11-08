@@ -1,6 +1,9 @@
+/* Italian 7x7 means ranked by ascending standard deviation */
+
 SELECT 
 	personId as WCAID, 
-	personName as Name, 
+	personName as Name,
+	competitionId as Comp,
 	value1 as solve1,
 	value2 as solve2,
 	value3 as solve3,
