@@ -25,7 +25,7 @@ FROM (
 JOIN 
 	Persons p
 ON 
-	p.id = t.personId
+	p.wca_id = t.personId
 GROUP BY 
 	t.personId
 ORDER BY 
