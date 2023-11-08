@@ -1,3 +1,5 @@
+/* days since last gold of people that competed after the pandemic (2021) */
+
 SELECT 
 	*, 
 	DATEDIFF(CURDATE(),t.last_gold) as dslg
@@ -24,7 +26,7 @@ FROM (
 			WHERE 
 				r2.competitionId = c2.id AND
 				r2.countryId = 'Italy' AND
-				c2.year > 2021
+				RIGHT(c2.id,4) > 2020
 			)
 	GROUP BY 
 		r.personId
