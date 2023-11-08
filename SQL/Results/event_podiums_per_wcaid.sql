@@ -6,7 +6,7 @@ FROM
 WHERE 
 	(roundTypeId = 'f' OR roundTypeId = 'c') AND 
 	pos = 1 AND 
-	personId = '2009ROTA01' AND 
+	personId = ':wca_id' AND 
 	best > 0
 GROUP BY 
 	Events
