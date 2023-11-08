@@ -1,3 +1,5 @@
+/* Most championships attended */
+
 SELECT 
 	r.personId, 
 	r.personName as name, 
@@ -5,10 +7,10 @@ SELECT
 FROM 
 	Results r, 
 	Competitions c,
-    championships s
+    	championships s
 WHERE 
 	r.competitionId = c.id AND
-    s.competition_id = c.id
+    	s.competition_id = c.id
 GROUP BY 
 	r.personid
 ORDER BY 
