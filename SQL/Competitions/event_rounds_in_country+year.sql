@@ -1,3 +1,5 @@
+/* Number of rounds held per event in country, year */
+
 SELECT 
 	p.Event, 
 	SUM(p.TimesHeld) as Rounds 
@@ -12,8 +14,8 @@ FROM
 	ON 
 		r.competitionId = c.id
 	WHERE 
-		c.countryId = 'USA' AND 
-		year = 2022
+		c.countryId = ':country' AND 
+		RIGHT(c.id,4) = :year
 	GROUP BY 
 		eventId, 
 		competitionId)p
