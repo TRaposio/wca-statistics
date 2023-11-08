@@ -1,20 +1,21 @@
 /* Competitions in which the same 3 people shared all podiums, ordered by the number of events (at least 2 events) */
 
 SELECT 
-	competitionId as competition,
-    	COUNT(DISTINCT eventId) as podiums,
-    	GROUP_CONCAT(DISTINCT(personId) SEPARATOR ', ') as IdList,
-    	GROUP_CONCAT(DISTINCT(personName) SEPARATOR ', ') as names
+	r.competitionId as competition,
+    	COUNT(DISTINCT r.eventId) as podiums,
+    	GROUP_CONCAT(DISTINCT(r.personId) SEPARATOR ', ') as IdList,
+    	GROUP_CONCAT(DISTINCT(r.personName) SEPARATOR ', ') as names
 FROM 
-	Results 
+	Results r
 WHERE 
-	roundTypeId IN ("f", "c") AND 
-	pos <= 3 AND 
-	best >0 
+	r.roundTypeId IN ("f", "c") AND 
+	r.pos <= 3 AND 
+	r.best >0 
 GROUP BY 
-	competitionId 
+	r.competitionId 
 HAVING 
-	COUNT(DISTINCT eventId) >1 AND 
-	COUNT(DISTINCT personId) <=3
+	COUNT(DISTINCT r.eventId) >1 AND
+	COUNT(DISTINCT r.eventId) = (SELECT COUNT(DISTINCT r2.eventId) from Results r2 WHERE r2.competitionId = r.competitionId) AND /* no strange comps */
+	COUNT(DISTINCT r.personId) <=3
 ORDER BY
     	podiums DESC
