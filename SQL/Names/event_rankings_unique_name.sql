@@ -1,3 +1,5 @@
+/* 333 rankings considering only Italians that don't share their name with other competitors */
+
 SELECT 
 	t.name, 
 	ROUND(AVG(t.best)/100,2) as avg, 
@@ -12,7 +14,7 @@ FROM
 	JOIN 
 	Persons p
 ON 
-	r.personid = p.id
+	r.personid = p.wca_id
 WHERE 
 	r.eventId = '333' AND 
 	p.countryId = 'Italy'
