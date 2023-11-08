@@ -1,3 +1,5 @@
+/*Competitions in which the pyraminx podium was faster than 2x2 podium ordered by delta*/
+
 WITH podium AS(
 SELECT r.competitionId, r.eventId, SUM(r.average) as podi
 FROM Results r, Competitions c
@@ -13,6 +15,3 @@ SELECT pyra.competitionId, ROUND(pyra.podi/100,2) as pyrapodium, ROUND(due.podi/
 FROM podium as pyra, podium as due
 WHERE pyra.eventId = 'pyram' AND due.eventId = '222' AND pyra.competitionId = due.competitionId
 ORDER BY delta DESC
-
-
-
