@@ -3,7 +3,7 @@ SELECT
 	personName, 
 	competitionId, 
 	eventId, 
-	CONCAT(c.year,'-',LPAD(c.month,2,0),'-',LPAD(c.day,2,0)) d 
+	c.end_date as d
 FROM 
 	Results r 
 JOIN 
