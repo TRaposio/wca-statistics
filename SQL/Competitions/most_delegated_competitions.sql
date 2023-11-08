@@ -10,7 +10,7 @@ FROM
 	Competitions c
 WHERE 
 	d.delegate_id = u.id AND 
-	u.wca_id = p.id AND 
+	u.wca_id = p.wca_id AND 
 	p.countryId = 'Italy' AND 
 	c.id = d.competition_id AND 
 	c.cancelled_at IS NULL AND 
