@@ -1,27 +1,29 @@
+/* Italians ranked by single / average ratio in [event] */
+
 SELECT 
 	q.WCAID, 
 	p.name, 
-	q.GTS
+	q.ratio
 FROM 
 	(SELECT 
-			s.personId as WCAID, 
-			s.best/a.best as GTS
+		s.personId as WCAID, 
+		s.best/a.best as ratio
 	FROM 
 		RanksSingle s
 	JOIN 
-			RanksAverage a
+		RanksAverage a
 	ON 
 		s.personId = a.personId AND 
 		s.eventId = a.eventId
 	WHERE 
-		s.eventId = '333'
+		s.eventId = ':event'
 	) as q
 JOIN 
 	Persons p
 ON 
-	p.id = q.WCAID
+	p.wca_id = q.WCAID
 WHERE 
 	p.countryId = 'Italy' AND 
 	p.subid = 1
 ORDER BY 
-	GTS DESC
+	3 DESC
