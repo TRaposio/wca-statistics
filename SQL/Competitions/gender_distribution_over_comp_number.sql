@@ -1,3 +1,5 @@
+/* percentage of male and female competitors for each number of competitions */
+
 WITH comps AS(
 	SELECT 
 		r.personId as id, 
@@ -16,7 +18,7 @@ FROM
 	comps c, 
 	Persons p
 WHERE 
-	c.id = p.id
+	c.id = p.wca_id
 GROUP BY 
 	c.compN
 ORDER BY 
