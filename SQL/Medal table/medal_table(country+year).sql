@@ -7,11 +7,9 @@ SELECT
 	SUM(IF(r.pos <= 3,1,0)) as Podiums
 FROM 
 	Competitions c, 
-	Results r, 
-	Persons p
+	Results r
 WHERE 
 	c.id = r.competitionId AND 
-	r.personId = p.id AND 
 	r.countryId = 'Italy' AND 
 	roundTypeId IN ('c','f') AND 
 	best > 0 AND 
