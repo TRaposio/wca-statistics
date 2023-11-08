@@ -1,3 +1,5 @@
+/* average of top 10 Italians for each name with at least 10 competitors */
+
 SELECT 
 	t.name, 
 	ROUND(AVG(t.best)/100,2) as avg
@@ -15,16 +17,17 @@ FROM (
 		JOIN 
 			Persons p
 		ON 
-			r.personid = p.id
+			r.personid = p.wca_id
 		WHERE 
-			r.eventId = '333'
+			r.eventId = '333' AND
+                        p.countryId = 'Italy'
 		)q
 	)t
 WHERE 
-	t.name_rank < 12
+	t.name_rank <= 10
 GROUP BY 
 	t.name
 HAVING 
-	COUNT(DISTINCT t.personId) = 11
+	COUNT(DISTINCT t.personId) = 10
 ORDER BY 
 	avg ASC
