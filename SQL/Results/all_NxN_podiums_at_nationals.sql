@@ -1,3 +1,5 @@
+/* People with a podium in 2x2 to 7x7 at Italian Championship */
+
 SELECT 
 	t.personId as id, 
 	p.name, 
@@ -22,7 +24,7 @@ FROM (
 JOIN 
 	Persons p
 ON 
-	p.id = t.personId
+	p.wca_id = t.personId
 WHERE
 	t.nr_rank <= 3
 GROUP BY
