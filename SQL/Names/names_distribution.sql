@@ -1,9 +1,9 @@
 SELECT 
 	t.name, 
-	COUNT(DISTINCT t.id) as Freq
+	COUNT(DISTINCT t.wca_id) as Freq
 FROM (
 	SELECT 
-		p.id, 
+		p.wca_id, 
 		SUBSTRING_INDEX(p.name,' ', 1) as name
 	FROM 
 		Persons p 
