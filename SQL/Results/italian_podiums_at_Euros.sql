@@ -1,16 +1,18 @@
+/* list of Italian podium finishers at the Rubik's Cube European Championship */
+
 SELECT 
 	t.personId as id,
-    t.personName as name, 
+    	t.personName as name, 
 	t.competitionId,
-    t.eventId
+    	t.eventId
 FROM (
 	SELECT 
 		r.personId,
-        r.personName, 
+        	r.personName, 
 		r.competitionId,
-        r.countryId,
+        	r.countryId,
 		r.eventId, 
-		RANK() OVER (PARTITION BY r.competitionId, r.eventId ORDER BY r.pos ASC) as nr_rank
+		RANK() OVER (PARTITION BY r.competitionId, r.eventId ORDER BY r.pos ASC) as er_rank
 	FROM 
 		Results r, 
 		championships s
@@ -22,7 +24,7 @@ FROM (
 		r.countryId IN (Select id from Countries WHERE continentId = '_Europe')
 	)t
 WHERE
-	t.nr_rank <= 3 AND
-    t.countryId = 'Italy'
+	t.er_rank <= 3 AND
+	t.countryId = 'Italy'
 ORDER BY
-    RIGHT(t.competitionId,4) ASC
+    	RIGHT(t.competitionId,4) ASC
