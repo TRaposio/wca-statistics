@@ -12,8 +12,8 @@ FROM
 	FROM 
 		RanksAverage r, Persons p
 	WHERE 
-		r.personId = p.id AND 
-        r.eventId = ':event' AND
+		r.personId = p.wca_id AND 
+        	r.eventId = ':event' AND
 		p.subid = 1
 	) q
 WHERE 
