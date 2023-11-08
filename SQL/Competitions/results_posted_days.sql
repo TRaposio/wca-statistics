@@ -5,7 +5,7 @@ FROM
 	Competitions
 WHERE 
     countryId = 'Italy' AND 
-    year > 2020 AND 
+    RIGHT(id,4) > 2020 AND 
     results_submitted_at IS NOT NULL
 ORDER BY 
 	2 ASC
