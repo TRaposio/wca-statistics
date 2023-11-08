@@ -1,7 +1,9 @@
+/* Italians ranked by the number of unique people they shared a podium with */
+
 SELECT 
 	a.personId as aID, 
 	a.personName as Name, 
-	COUNT(DISTINCT b.personId) as GTS
+	COUNT(DISTINCT b.personId) as On_podium_with
 FROM (
 	SELECT * 
 	FROM 
@@ -9,7 +11,8 @@ FROM (
 	WHERE 
 		r.roundTypeId IN ('f','c') AND 
 		r.best > 0 AND 
-		r.pos < 4
+		r.pos < 4 AND
+		r.countryId = 'Italy'
 	)a
 JOIN (
 	SELECT * 
