@@ -1,6 +1,6 @@
 SELECT 
 	r.personId, 
-	p.name, 
+	r.personName, 
 	SUM(IF(r.pos = 1,1,0)) as I°, 
 	SUM(IF(r.pos = 2,1,0)) as II°, 
 	SUM(IF(r.pos = 3,1,0)) as III° , 
@@ -8,16 +8,14 @@ SELECT
 	4*SUM(IF(r.pos = 1,1,0))+2*SUM(IF(r.pos = 2,1,0))+1*SUM(IF(r.pos = 3,1,0)) as Points
 FROM 
 	Competitions c, 
-	Results r, 
-	Persons p
+	Results r
 WHERE 
-	c.id = r.competitionId AND 
-	r.personId = p.id AND 
+	c.id = r.competitionId AND  
 	r.countryId = 'Italy' AND 
 	r.roundTypeId IN ('c','f') AND 
 	r.best > 0 AND 
 	r.pos < 4 AND 
-	c.year = 2022 
+	RIGHT(c.id,4) = 2023 
 GROUP BY 
 	r.personId
 ORDER BY 
@@ -25,4 +23,3 @@ ORDER BY
 	I° DESC, 
 	II° DESC, 
 	III° DESC
-
