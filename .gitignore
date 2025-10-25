@@ -1,0 +1,44 @@
+# Ignore Python cache and environment files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+*.egg
+env/
+venv/
+ENV/
+*.env
+
+# Ignore logs and outputs
+logs/
+output/
+
+# Ignore input data
+data/database_export/
+data/Italy_shapefile/
+data/Limiti01012022/Com01012022/
+data/Limiti01012022/ProvCM01012022/
+data/Limiti01012022/RipGeo01012022/
+
+# Ignore Jupyter notebooks folder
+notebooks/
+
+# Ignore system files
+.DS_Store
+Thumbs.db
+
+# Ignore temporary files
+*.tmp
+*.swp
+*.bak
+
+# Ignore workspace files
+*.code-workspace
+
+# Ignore backup files
+readme_backup.txt
+
+# Temporary ignore
+data/df_regioni.csv
+misc/

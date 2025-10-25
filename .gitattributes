@@ -1,0 +1,25 @@
+# Treat all Python files as text and normalize line endings
+*.py text eol=lf
+
+# Treat all SQL files as text
+*.sql text eol=lf
+
+# Treat TSV and CSV files as text
+*.tsv text eol=lf
+*.csv text eol=lf
+
+# Treat Markdown and other text documentation as text
+*.md text eol=lf
+*.txt text eol=lf
+
+# Treat figures and binaries as binary to avoid Git trying to diff them
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.pdf binary
+*.svg binary
+
+# Ignore line endings for configuration files (but still track them)
+*.ini text eol=lf
+*.json text eol=lf
