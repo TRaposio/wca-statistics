@@ -8,6 +8,7 @@ import logging
 import sys
 from datetime import datetime
 import inspect
+import numpy as np
 
 
 ############ LOGGER ############
@@ -76,13 +77,41 @@ def setup_logger(name: str, level=logging.INFO, log_root: Path | str = "./logs")
 ############ CONFIG ############
 
 
-def load_config(config_path: str | Path = "config.ini") -> configparser.ConfigParser:
+def load_config(logger: logging.Logger, config_path: str | Path = "config.ini") -> configparser.ConfigParser:
     """
     Import the config file.
     """
 
+    logger.info(f"Gathering info from config {config_path}")
+
     config = configparser.ConfigParser()
     config.read(config_path)
+
+    # Lettura variabili globali
+    current_events = [
+        x.strip() for x in config["global_variables"]["current_events"].split(",")
+    ]
+    multivenue = [
+        x.strip() for x in config["global_variables"]["multivenue"].split(",")
+    ]
+
+    config.current_events = current_events
+    config.multivenue = multivenue
+    config.year = int(config["global_variables"]["year"])
+    config.country = config["global_variables"]["country"]
+    config.nationality = config["global_variables"]["nationality"]
+    config.championship_type = config["global_variables"]["championship_type"]
+
+    if config.has_section("plot"):
+        fig_size = tuple(
+            float(x.strip()) for x in config["plot"]["figure_size"].split(",")
+        )
+        config.figure_size = fig_size
+        config.dpi = int(config["plot"]["dpi"])
+    else:
+        config.figure_size = (12, 6)
+        config.dpi = 100
+
     return config
 
 
@@ -186,12 +215,7 @@ def export_data(results: dict, figures: dict | None, section_name: str, config, 
     logger : logging.Logger, optional
         Logger for messages.
 
-    Returns
-    -------
-    dict
-        Paths of saved files: {'excel': Path, 'figures': [Path, ...]}
     """
-    saved_files = {}
 
     # --- Timestamp ---
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -214,7 +238,7 @@ def export_data(results: dict, figures: dict | None, section_name: str, config, 
         template = "{section_name}_{timestamp}.xlsx"
 
     excel_file = module_dir / template.format(section_name=section_name, timestamp=timestamp)
-    with pd.ExcelWriter(excel_file) as writer:
+    with pd.ExcelWriter(excel_file, engine="openpyxl") as writer:
         for sheet_name, df in results.items():
             df.to_excel(writer, sheet_name=sheet_name[:31], index=False)
 
@@ -225,7 +249,7 @@ def export_data(results: dict, figures: dict | None, section_name: str, config, 
     figure_paths = []
     if figures:
         try:
-            figures_sub = config["output"].get("figures_subfolder", "figures")
+            figures_sub = config["output"]["figures_subfolder"]
         except KeyError:
             figures_sub = "figures"
 
@@ -240,7 +264,57 @@ def export_data(results: dict, figures: dict | None, section_name: str, config, 
             if logger:
                 logger.info(f"Figure saved to {fig_path.resolve()}")
 
-def import_test(string):
-    print(string)
-    return True
 
+############ Functions ############
+
+
+def truncate(num: float, n: int) -> float:
+    """
+    Truncate a number to a given number of decimal places.
+
+    The WCA uses n=2 for all officially recorded times and 
+    rounds for averages.
+
+    Parameters
+    ----------
+    num : float
+        The number to truncate.
+    n : int
+        The number of decimal places to keep.
+
+    Returns
+    -------
+    float
+        The truncated number, or NaN if the input is NaN.
+    """
+    if np.isnan(num):
+        return np.nan
+
+    integer = int(num * (10 ** n)) / (10 ** n)
+    return float(integer)
+
+def timeconvert(x: float) -> str:
+    """
+    Convert a WCA time in centiseconds to a human-readable string.
+
+    Converts a time value (in centiseconds) to the format:
+    - 'SS.CC' if under one minute
+    - 'M:SS.CC' if one minute or more
+
+    Parameters
+    ----------
+    x : float
+        The time value in centiseconds.
+
+    Returns
+    -------
+    str
+        The formatted time string.
+    """
+    if x < 6000:
+        return f"{x / 100:.2f}"
+    else:
+        a = x % 6000
+        if a < 1000:
+            return f"{int(x / 6000)}:0{a / 100:.2f}"
+        return f"{int(x / 6000)}:{a / 100:.2f}"

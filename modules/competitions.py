@@ -4,26 +4,67 @@ import utils_wca as uw
 import matplotlib.pyplot as plt
 from datetime import datetime
 
-def most_competitions(df_competitions):
-    top = df_competitions['name'].value_counts().head(10).reset_index()
-    top.columns = ['Competition', 'Count']
-    return top
+import pandas as pd
 
-def most_countries(df_competitions):
-    top = df_competitions['countryId'].value_counts().head(10).reset_index()
-    top.columns = ['Country', 'Count']
-    return top
+def most_competitions(db_tables: dict, config, logger=None) -> pd.DataFrame:
+    """
+    Rank competitors by the number of attended competitions.
+    """
+
+    if logger:
+        logger.info("Computing most competitions per competitor...")
+
+    # Retrieve necessary tables
+    try:
+        results = db_tables["results"]
+        persons = db_tables["persons"]
+    except KeyError as e:
+        raise KeyError(f"Missing table in db_tables: {e}")
+
+    country_filter = config.country
+
+    # Count unique competitions per competitor
+    df_counts = (
+        results.query("personCountryId == @country_filter")
+        .groupby("personId")["competitionId"]
+        .nunique()
+        .reset_index()
+        .rename(columns={"personId": "WCAID", "competitionId": "Number of Competitions"})
+    )
+
+    # Merge with persons table to get competitor names
+    df_final = (
+        df_counts
+        .merge(persons[["id", "name"]], how="left", left_on="WCAID", right_on="id")
+        .drop(columns="id")
+        .rename(columns={"name": "Name"})
+        .sort_values(by="Number of Competitions", ascending=False)
+        .reset_index(drop=True)
+    )
+
+    df_final.index += 1
+
+    if logger:
+        logger.info(f"Computed most competitions: {len(df_final)} competitors")
+
+    return df_final[["WCAID", "Name", "Number of Competitions"]]
+
+
 
 def run(db_tables, config, logger):
-    # df_comp = db_tables["competitions"]
 
-    # results = {
-    #     "Most Competitions": most_competitions(df_comp),
-    #     "Most Countries": most_countries(df_comp),
+    plt.rcParams["figure.figsize"] = config.figure_size
+    plt.rcParams["figure.dpi"] = config.dpi
+
+    logger.info("Producing stats for Competitions module")
+
+    results = {
+        "Most Competitions": most_competitions(db_tables=db_tables, config=config, logger=logger),
+    }
+
+    # figures = {
+    #     "Competitions": "a"
     # }
-
-    # # Create figures dict
-    # figures = {}
 
     # # Example figure
     # fig, ax = plt.subplots(figsize=(8,6))
@@ -33,9 +74,4 @@ def run(db_tables, config, logger):
     # figures["top10_competitions"] = fig
 
     section_name = __name__.split(".")[-1]
-    a = uw.import_test(section_name)
-
-    print(a)
-
-
-    # uw.export_data(results, figures, section_name=section_name, config=config, logger=logger)
+    uw.export_data(results, figures=None, section_name=section_name, config=config, logger=logger) #figures

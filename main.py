@@ -6,7 +6,8 @@ def main():
     logger = setup_logger(__name__)
     logger.info("Starting WCA pipeline...")
 
-    config = load_config()
+    config = load_config(logger=logger, config_path="config.ini")
+
     update_data(config, logger=logger)
 
     # --- Load all common tables once ---
