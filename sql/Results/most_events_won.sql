@@ -13,6 +13,7 @@ WHERE
 	t.pos = 1 AND 
 	t.best > 0
 GROUP BY 
-	t.person_id
+	t.person_id,
+	t.person_name
 ORDER BY 
 	3 DESC
