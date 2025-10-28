@@ -9,9 +9,16 @@ import sys
 from datetime import datetime
 import inspect
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 ############ LOGGER ############
+
+class ExitOnCriticalHandler(logging.Handler):
+    """Custom handler that stops execution on CRITICAL logs."""
+    def emit(self, record):
+        if record.levelno >= logging.CRITICAL:
+            sys.exit(1)
 
 
 def setup_logger(name: str, level=logging.INFO, log_root: Path | str = "./logs") -> logging.Logger:
@@ -68,6 +75,9 @@ def setup_logger(name: str, level=logging.INFO, log_root: Path | str = "./logs")
     file_handler = logging.FileHandler(log_path, encoding="utf-8")
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
+
+    #stop exec on criticals
+    logger.addHandler(ExitOnCriticalHandler())
 
     logger.info(f"Logger initialized. Writing logs to {log_path.resolve()}")
 
@@ -133,7 +143,7 @@ def get_database_dir(config: configparser.ConfigParser) -> Path:
     return db_dir
 
 
-def update_data(config: configparser.ConfigParser, force: bool = False, logger: logging.Logger | None = None) -> None:
+def update_data(config: configparser.ConfigParser, logger: logging.Logger | None = None) -> None:
     """
     Download the latest WCA export if not already downloaded today.
     Uses logger if provided.
@@ -144,24 +154,30 @@ def update_data(config: configparser.ConfigParser, force: bool = False, logger: 
 
     today_str = datetime.now().date().isoformat()
 
-    if logger is None:
-        import logging
-        logger = logging.getLogger(__name__)
-
     # Check if already updated today
-    if not force and meta_file.exists():
+    if meta_file.exists():
         last_update = meta_file.read_text().strip()
         if last_update == today_str:
-            logger.info(f"Data already up to date (last update: {last_update})")
+            if logger:
+                logger.info(f"Data already up to date (last update: {last_update})")
+            else:
+                print(f"Data already up to date (last update: {last_update})")
             return
 
-    logger.info(f"Downloading new WCA export from {url} ...")
+    if logger:
+        logger.info(f"Downloading new WCA export from {url} ...")
+    else:
+        print(f"Downloading new WCA export from {url} ...")
+
     zip_path, _ = urllib.request.urlretrieve(url)
     with zipfile.ZipFile(zip_path, "r") as f:
         f.extractall(db_dir)
 
     meta_file.write_text(today_str)
-    logger.info(f"WCA data updated successfully on {today_str} in {db_dir}")
+    if logger:
+        logger.info(f"WCA data updated successfully on {today_str} in {db_dir}")
+    else:
+        print(f"WCA data updated successfully on {today_str} in {db_dir}")
 
 
 def read_table(table_name: str, config: configparser.ConfigParser, logger: logging.Logger | None = None) -> pd.DataFrame:
@@ -171,34 +187,179 @@ def read_table(table_name: str, config: configparser.ConfigParser, logger: loggi
     """
     db_dir = get_database_dir(config)
 
-    if logger is None:
-        import logging
-        logger = logging.getLogger(__name__)
-
     if not config.has_section("tables"):
-        raise KeyError("Missing [tables] section in config.ini")
+        if logger:
+            logger.critical("Missing [tables] section in config.ini")
+        else:
+            raise KeyError("Missing [tables] section in config.ini")
 
     tables_map = dict(config.items("tables"))
     if table_name not in tables_map:
-        raise KeyError(f"Table '{table_name}' not found in [tables] section of config.ini")
+        if logger:
+            logger.critical(f"Table '{table_name}' not found in [tables] section of config.ini")
+        else:
+            raise KeyError(f"Table '{table_name}' not found in [tables] section of config.ini")
 
     file_name = tables_map[table_name]
     file_path = db_dir / file_name
 
     if not file_path.exists():
-        raise FileNotFoundError(f"File not found: {file_path}. You may need to run update_data().")
+        if logger:
+            logger.critical(f"File not found: {file_path}. You may need to run update_data().")
+        else:
+            raise FileNotFoundError(f"File not found: {file_path}. You may need to run update_data().")
 
     df = pd.read_csv(file_path, sep="\t", low_memory=False)
-    logger.info(f"Loaded '{table_name}' from {file_path.name} ({len(df):,} rows)")
+
+    if logger:
+        logger.info(f"Loaded '{table_name}' from {file_path.name} ({len(df):,} rows)")
+    else:
+        print(f"Loaded '{table_name}' from {file_path.name} ({len(df):,} rows)")
+
     return df
 
+def process_tables(db_tables: dict[str, pd.DataFrame], config: configparser.ConfigParser, logger: logging.Logger) -> dict[str, pd.DataFrame]:
+    """
+    Perform common operations on db_tables. e.g. Merges the 'results' and 'competitions' tables on 'competitionId' and filters rows to include only competitors from the configured country.
 
-from pathlib import Path
-from datetime import datetime
-import pandas as pd
-import matplotlib.pyplot as plt
+    Parameters
+    ----------
+    db_tables : dict[str, pd.DataFrame]
+        Dictionary containing loaded WCA .tsv tables.
+    config : ConfigParser
+        Configuration object loaded with load_config().
+    logger : logging.Logger, optional
 
-def export_data(results: dict, figures: dict | None, section_name: str, config, logger=None) -> dict:
+    Returns
+    -------
+    dict[str, pd.DataFrame]
+    """
+
+    logger.info("Preprocessing tables...")
+
+    # --- Merge results with competitions + filter for nationality ---
+    try:  
+        # Rename column in competitions
+        db_tables["competitions"] = db_tables["competitions"].rename(columns = {'name':'competitionName'})
+
+        logger.info("Renamed column name to competitionName in competitions dataframe")
+
+        # Filter for nationality
+        nationality_filter = config.nationality
+        results_filtered = db_tables["results"].query("personCountryId == @nationality_filter")
+        
+        df = (
+            results_filtered.merge(
+                db_tables["competitions"],
+                left_on="competitionId",
+                right_on="id",
+                how="left",
+                validate = "m:1"
+            )
+            .drop('id', axis=1)
+            .merge(
+                db_tables["rounds"][['id','rank']],
+                how='left',
+                left_on='roundTypeId',
+                right_on='id'
+            )
+            .drop('id', axis=1)
+        )
+
+        df['date'] = pd.to_datetime(df[['year','month','day']])
+
+        db_tables["results_nationality"] = df
+
+        # Filter for host country
+        country_filter = config.country
+        competitions_filtered = db_tables["competitions"].query("countryId == @country_filter")
+
+        df = (
+            db_tables["results"].merge(
+                competitions_filtered,
+                left_on="competitionId",
+                right_on="id",
+                how="inner",
+                validate = "m:1"
+            )
+            .drop('id', axis=1)
+            .merge(
+                db_tables["rounds"][['id','rank']],
+                how='left',
+                left_on='roundTypeId',
+                right_on='id'
+            )
+            .drop('id', axis=1)
+        )
+
+        db_tables["results_country"] = df
+
+        logger.info(f"Created 'results_nationality' from results+competitions with only competitors from country = {nationality_filter}.")
+        logger.info(f"Created 'results_country' from results+competitions with only competitions from country = {country_filter}.")
+
+    except Exception as e:
+        logger.critical(f"Error during results/competitions merge: {e}", exc_info=True)
+    
+
+    # --- Extract list of championships ---
+    try:
+        config.nats = (
+            list(
+                db_tables["championships"][db_tables["championships"]['championship_type'] == config.championship_type]['competition_id']
+            )
+        )
+        logger.info("extracted list of national championships")
+
+    except Exception as e:
+        logger.critical(f"Error during the listing of championships for championship type {config.championship_type}: {e}", exc_info=True)
+
+
+    # --- Merge persons with ranks single ---
+    try:
+        db_tables["ranks_single"] = (
+            db_tables["ranks_single"]
+            .merge(
+                db_tables["persons"][['id','name','countryId']], 
+                how='left', 
+                left_on='personId', 
+                right_on='id'
+            )
+            .drop('id', axis=1)
+        )
+        logger.info("Merged persons with ranks_single")
+
+    except Exception as e:
+        logger.critical(f"Error during ranks_single/persons merge: {e}", exc_info=True)
+
+
+    # --- Merge persons with ranks average ---
+    try:
+        db_tables["ranks_average"] = (
+            db_tables["ranks_average"]
+            .merge(
+                db_tables["persons"][['id','name','countryId']], 
+                how='left', 
+                left_on='personId', 
+                right_on='id'
+            )
+            .drop('id', axis=1)
+        )
+        logger.info("Merged persons with ranks_average")
+
+    except Exception as e:
+        logger.critical(f"Error during ranks_average/persons merge: {e}", exc_info=True)
+
+    # Useful country lists
+    config.countries = (
+        list(
+            db_tables["competitions"]['countryId'].drop_duplicates()
+        )
+    )
+    config.real_countries = [x for x in config.countries if x not in config.multivenue]
+
+    return db_tables
+
+def export_data(results: dict, figures: dict | None, section_name: str, config: configparser.ConfigParser, logger: logging.Logger | None = None) -> dict:
     """
     Export module results: Excel + optional figures.
 

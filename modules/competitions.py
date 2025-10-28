@@ -3,30 +3,28 @@ import pandas as pd
 import utils_wca as uw
 import matplotlib.pyplot as plt
 from datetime import datetime
+import configparser
+import logging
 
 import pandas as pd
 
-def most_competitions(db_tables: dict, config, logger=None) -> pd.DataFrame:
+def most_competitions(db_tables: dict, config: configparser.ConfigParser, logger: logging.Logger) -> pd.DataFrame:
     """
     Rank competitors by the number of attended competitions.
     """
 
-    if logger:
-        logger.info("Computing most competitions per competitor...")
+    logger.info("Computing most competitions per competitor...")
 
     # Retrieve necessary tables
     try:
-        results = db_tables["results"]
+        results = db_tables["results_nationality"]
         persons = db_tables["persons"]
     except KeyError as e:
-        raise KeyError(f"Missing table in db_tables: {e}")
-
-    country_filter = config.country
+        logger.critical(f"Missing table in db_tables: {e}")
 
     # Count unique competitions per competitor
     df_counts = (
-        results.query("personCountryId == @country_filter")
-        .groupby("personId")["competitionId"]
+        results.groupby("personId")["competitionId"]
         .nunique()
         .reset_index()
         .rename(columns={"personId": "WCAID", "competitionId": "Number of Competitions"})
@@ -44,8 +42,7 @@ def most_competitions(db_tables: dict, config, logger=None) -> pd.DataFrame:
 
     df_final.index += 1
 
-    if logger:
-        logger.info(f"Computed most competitions: {len(df_final)} competitors")
+    logger.info(f"Computed most competitions: {len(df_final)} competitors")
 
     return df_final[["WCAID", "Name", "Number of Competitions"]]
 
