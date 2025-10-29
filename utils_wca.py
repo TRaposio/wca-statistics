@@ -249,7 +249,8 @@ def process_tables(db_tables: dict[str, pd.DataFrame], config: configparser.Conf
         results_filtered = db_tables["results"].query("personCountryId == @nationality_filter")
         
         df = (
-            results_filtered.merge(
+            results_filtered
+            .merge(
                 db_tables["competitions"],
                 left_on="competitionId",
                 right_on="id",
@@ -275,7 +276,8 @@ def process_tables(db_tables: dict[str, pd.DataFrame], config: configparser.Conf
         competitions_filtered = db_tables["competitions"].query("countryId == @country_filter")
 
         df = (
-            db_tables["results"].merge(
+            db_tables["results"]
+            .merge(
                 competitions_filtered,
                 left_on="competitionId",
                 right_on="id",
