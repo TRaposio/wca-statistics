@@ -10,78 +10,85 @@ from datetime import datetime
 import inspect
 import numpy as np
 import matplotlib.pyplot as plt
+from cycler import cycler
+import traceback
 
 
 ############ LOGGER ############
 
+
 class ExitOnCriticalHandler(logging.Handler):
-    """Custom handler that stops execution on CRITICAL logs."""
+    """
+    Custom handler that immediately terminates execution
+    when a CRITICAL log is emitted.
+    """
+
     def emit(self, record):
-        if record.levelno >= logging.CRITICAL:
+        try:
+            if record.levelno >= logging.CRITICAL:
+                logging.shutdown()
+
+                # Print final CRITICAL message cleanly to stderr
+                sys.stderr.write(
+                    f"\n\n[CRITICAL] {record.getMessage()}\n"
+                )
+                if record.exc_info:
+                    traceback.print_exception(*record.exc_info)
+
+                sys.stderr.write("\nExecution halted due to critical error.\n")
+                sys.stderr.flush()
+
+                # Exit with a nonzero status code
+                sys.exit(1)
+
+        except Exception:
+            # Fallback if logging itself fails
+            sys.stderr.write("\n[CRITICAL] Failed to terminate cleanly.\n")
             sys.exit(1)
 
 
 def setup_logger(name: str, level=logging.INFO, log_root: Path | str = "./logs") -> logging.Logger:
     """
     Set up a logger that writes to both console and file.
-
-    Parameters
-    ----------
-    name : str
-        Usually __name__ of the calling module.
-    level : int
-        Logging level (default: logging.INFO)
-    log_root : Path | str
-        Root folder for all log files (default: ./logs)
-
-    Returns
-    -------
-    logging.Logger
-        Configured logger instance
+    Applies globally to all modules in the project.
     """
-    logger = logging.getLogger(name)
-    logger.setLevel(level)
+    # --- Root logger ---
+    root_logger = logging.getLogger()
+    root_logger.setLevel(level)
 
-    # If already configured, return the same logger
-    if logger.hasHandlers():
-        return logger
+    # Prevent adding duplicate handlers
+    if not root_logger.handlers:
+        formatter = logging.Formatter(
+            "[%(asctime)s] %(levelname)s - %(name)s - %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
 
-    # --- Formatter ---
-    formatter = logging.Formatter(
-        "[%(asctime)s] %(levelname)s - %(name)s - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
+        # --- Console handler ---
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler.setFormatter(formatter)
+        root_logger.addHandler(console_handler)
 
-    # --- Console handler ---
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
+        # --- File handler ---
+        log_root = Path(log_root)
+        date_subfolder = datetime.now().strftime("%Y-%m-%d")
+        log_dir = log_root / date_subfolder
+        log_dir.mkdir(parents=True, exist_ok=True)
 
-    # --- File handler ---
-    log_root = Path(log_root)
-    date_subfolder = datetime.now().strftime("%Y-%m-%d")
-    log_dir = log_root / date_subfolder
-    log_dir.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        log_filename = f"{name}_{timestamp}.log"
+        log_path = log_dir / log_filename
 
-    # Identify caller script (e.g. "main.py" → "main")
-    caller_filename = Path(inspect.stack()[1].filename).stem
+        file_handler = logging.FileHandler(log_path, encoding="utf-8")
+        file_handler.setFormatter(formatter)
+        root_logger.addHandler(file_handler)
 
-    # Unique timestamp for this run
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        # stop execution on critical
+        root_logger.addHandler(ExitOnCriticalHandler())
 
-    log_filename = f"{caller_filename}_{timestamp}.log"
-    log_path = log_dir / log_filename
+        root_logger.info(f"Logger initialized. Writing logs to {log_path.resolve()}")
 
-    file_handler = logging.FileHandler(log_path, encoding="utf-8")
-    file_handler.setFormatter(formatter)
-    logger.addHandler(file_handler)
-
-    #stop exec on criticals
-    logger.addHandler(ExitOnCriticalHandler())
-
-    logger.info(f"Logger initialized. Writing logs to {log_path.resolve()}")
-
-    return logger
+    # Return a named child logger
+    return logging.getLogger(name)
 
 
 ############ CONFIG ############
@@ -123,6 +130,70 @@ def load_config(logger: logging.Logger, config_path: str | Path = "config.ini") 
         config.dpi = 100
 
     return config
+
+
+############ PLOTS ############
+
+
+def set_plot_style(config: configparser.ConfigParser, logger: logging.Logger | None = None):
+    """
+    Apply consistent matplotlib styling based on config.ini [plot] section.
+    """
+    try:
+        cfg = config["plot"]
+
+        # --- Parse color cycle ---
+        colors = [c.strip() for c in cfg.get("color_cycle", "").split(",") if c.strip()]
+
+        # --- Parse figure size safely ---
+        try:
+            fig_size = eval(cfg.get("figure_size", "(8, 5)"))
+        except Exception:
+            fig_size = (8, 5)
+            if logger:
+                logger.warning("Invalid 'figure_size' in config.ini, using default (8, 5)")
+
+        # --- Update matplotlib rcParams ---
+        plt.rcParams.update({
+            # --- Figure ---
+            "figure.figsize": fig_size,
+            "figure.dpi": cfg.getint("dpi", 150),
+            "savefig.dpi": cfg.getint("save_dpi", 300),
+            "savefig.bbox": cfg.get("bbox", "tight"),
+            "figure.autolayout": cfg.getboolean("autolayout", True),
+
+            # --- Axes ---
+            "axes.titlesize": cfg.getint("axes_title_size", 14),
+            "axes.labelsize": cfg.getint("axes_label_size", 12),
+            "axes.grid": cfg.getboolean("axes_grid", True),
+            "axes.edgecolor": cfg.get("axes_edge_color", "gray"),
+            "grid.alpha": cfg.getfloat("grid_alpha", 0.4),
+            "grid.linestyle": cfg.get("grid_linestyle", ":"),
+            "grid.color": cfg.get("grid_color", "lightgray"),
+
+            # --- Font ---
+            "font.family": cfg.get("font_family", "sans-serif"),
+            "font.sans-serif": [x.strip() for x in cfg.get("font_sans_serif", "DejaVu Sans").split(",")],
+            "font.size": cfg.getint("font_size", 11),
+            "text.color": cfg.get("text_color", "black"),
+
+            # --- Ticks and Legend ---
+            "xtick.labelsize": cfg.getint("tick_label_size", 10),
+            "ytick.labelsize": cfg.getint("tick_label_size", 10),
+            "legend.fontsize": cfg.getint("legend_font_size", 10),
+            "legend.frameon": cfg.getboolean("legend_frame", False),
+
+            # --- Lines & Colors ---
+            "lines.linewidth": cfg.getfloat("line_width", 2.0),
+            "axes.prop_cycle": cycler("color", colors or ["#1f77b4", "#ff7f0e", "#2ca02c"]),
+        })
+
+        if logger:
+            logger.info("Matplotlib plotting style successfully applied from config.ini")
+
+    except Exception as e:
+        if logger:
+            logger.warning(f"Could not set plotting style: {e}", exc_info=True)
 
 
 ############ UTILS ############
@@ -217,6 +288,7 @@ def read_table(table_name: str, config: configparser.ConfigParser, logger: loggi
         print(f"Loaded '{table_name}' from {file_path.name} ({len(df):,} rows)")
 
     return df
+
 
 def process_tables(db_tables: dict[str, pd.DataFrame], config: configparser.ConfigParser, logger: logging.Logger) -> dict[str, pd.DataFrame]:
     """
@@ -361,6 +433,7 @@ def process_tables(db_tables: dict[str, pd.DataFrame], config: configparser.Conf
 
     return db_tables
 
+
 def export_data(results: dict, figures: dict | None, section_name: str, config: configparser.ConfigParser, logger: logging.Logger | None = None) -> dict:
     """
     Export module results: Excel + optional figures.
@@ -409,7 +482,6 @@ def export_data(results: dict, figures: dict | None, section_name: str, config: 
         logger.info(f"{section_name} results exported to Excel: {excel_file.resolve()}")
 
     # --- Figures ---
-    figure_paths = []
     if figures:
         try:
             figures_sub = config["output"]["figures_subfolder"]
@@ -423,7 +495,6 @@ def export_data(results: dict, figures: dict | None, section_name: str, config: 
             fig_path = fig_dir / f"{fig_name}_{timestamp}.png"
             fig.savefig(fig_path)
             plt.close(fig)
-            figure_paths.append(fig_path)
             if logger:
                 logger.info(f"Figure saved to {fig_path.resolve()}")
 
