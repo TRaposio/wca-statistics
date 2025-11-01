@@ -74,7 +74,7 @@ def setup_logger(name: str, level=logging.INFO, log_root: Path | str = "./logs")
         log_dir = log_root / date_subfolder
         log_dir.mkdir(parents=True, exist_ok=True)
 
-        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
         log_filename = f"{name}_{timestamp}.log"
         log_path = log_dir / log_filename
 
@@ -454,7 +454,7 @@ def export_data(results: dict, figures: dict | None, section_name: str, config: 
     """
 
     # --- Timestamp ---
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
 
     # --- Output folder ---
     try:

@@ -2,6 +2,7 @@ from pathlib import Path
 import pandas as pd
 import utils_wca as uw
 import matplotlib.pyplot as plt
+import matplotlib.ticker as mticker
 from datetime import datetime
 import configparser
 import logging
@@ -390,28 +391,33 @@ def plot_competition_distribution(
         fig, ax = plt.subplots()
 
         # --- Plot line ---
-        ax.plot(
-            df["year"],
-            df["Number of Competitions"],
-            color="tab:blue",
-            marker="o",
-            linewidth=2,
-            zorder=2,
-        )
+        ax.plot(df["year"], df["Number of Competitions"], color="tab:blue", marker="o", linewidth=2, zorder=2)
 
         # --- Labels & title ---
         ax.set_title(f"Competitions per Year - {config.country}", fontweight="bold")
-        ax.set_xlabel("Year")
-        ax.set_ylabel("Number of Competitions")
+        ax.set_xlabel("Year", fontweight="bold")
+        ax.set_ylabel("Number of Competitions", fontweight="bold")
 
         # --- Grid (follows global style) ---
         ax.grid(True, which="major", axis="y", zorder=1)
 
         # --- X ticks ---
         years = range(df["year"].min(), df["year"].max() + 1)
-        step = max(len(years) // 10, 1)
-        ax.set_xticks(years[::step])
-        ax.set_xticklabels(years[::step], rotation=45, ha="center", fontsize=9)
+        ax.set_xticks(years)
+        ax.set_xticklabels(years, rotation=45, ha="center")
+
+        # --- Footnote for total competitions ---
+        tot = df["Number of Competitions"].sum().astype(int)
+        if tot:
+            note = f"{tot} total competitions were held the country."
+            fig.text(
+                0.5, 0.005,  # centered at bottom
+                note,
+                ha="center",
+                fontsize=9,
+                color="dimgray",
+                style="italic"
+            )
 
         # --- Apply tight layout and close (no popup) ---
         fig.tight_layout()
@@ -424,6 +430,272 @@ def plot_competition_distribution(
         logger.critical(f"Error creating Competition Distribution plot: {e}", exc_info=True)
 
 
+def plot_unique_competitor_distribution(
+    db_tables: dict,
+    config: configparser.ConfigParser,
+    logger: logging.Logger
+) -> plt.Figure:
+    
+    """
+    Plots competitor and newcomer distribution for a specific nationality.
+    """
+
+    try:
+        logger.info(f"Creating figure: Competition Distribution for country {config.nationality}")
+
+        # --- Load data ---
+        if "newcomers" not in db_tables:
+            logger.critical("'newcomers' table not found in db_tables.")
+        
+        df = db_tables["newcomers"].query("year > 2000")
+
+        # --- Create figure and axis ---
+        fig, ax = plt.subplots()
+
+        # --- Plot line ---
+        ax.bar(df["year"], df["Competitors"], color="#eee600", zorder=2, label="Competitors")
+        ax.bar(df["year"], df["Newcomer"], color="#4179e1", zorder=3, label="Newcomers")
+
+        # --- Labels & title ---
+        ax.set_title(f"Number of Unique Competitors - {config.country}", fontweight="bold")
+        ax.set_xlabel("Year", fontweight="bold")
+        ax.set_ylabel("Unique Persons", fontweight="bold")
+
+        # --- Grid (follows global style) ---
+        ax.grid(True, which="major", axis="y", zorder=1)
+
+        # --- X ticks ---
+        years = range(df["year"].min(), df["year"].max() + 1)
+        ax.set_xticks(years)
+        plt.setp(ax.get_xticklabels(), rotation=45, ha="center")
+
+        # --- Footnote for total competitions ---
+        tot = db_tables["newcomers"]["Newcomer"].sum().astype(int)
+        if tot:
+            note = f"The WCA has registered {tot} competitors from country {config.country}."
+            fig.text(
+                0.5, 0.005,  # centered at bottom
+                note,
+                ha="center",
+                fontsize=9,
+                color="dimgray",
+                style="italic"
+            )
+
+        # --- Apply tight layout and close (no popup) ---
+        fig.tight_layout()
+        plt.close(fig)
+
+        logger.info("Figure 'Competitor Distribution' created successfully.")
+        return fig
+
+    except Exception as e:
+        logger.critical(f"Error creating Competition Distribution plot: {e}", exc_info=True)
+
+
+def plot_newcomers_ratio(
+    db_tables: dict,
+    config,
+    logger
+) -> plt.Figure:
+    """
+    Plots newcomer ratios (overall and by gender) per year.
+    """
+    try:
+        logger.info(f"Creating figure: Newcomer Ratios for {config.nationality}")
+
+        # --- Load data ---
+        if "newcomers" not in db_tables:
+            logger.critical("'newcomers' table not found in db_tables.")
+            return None
+
+        df = db_tables["newcomers"].query("year > 2000")
+
+        # --- Create figure ---
+        fig, ax = plt.subplots()
+
+        # --- Grid ---
+        ax.grid(which="major", axis="y", zorder=1)
+
+        # --- Plot lines ---
+        ax.plot(df["year"], df["Newcomer Ratio"], color="#6d757b", lw=5, alpha=0.3, label="Total", zorder=3)
+        ax.plot(df["year"], df["Newcomer Ratio M"], color="#2c19d8", lw=2.5, label="Male", linestyle="-", marker=".", zorder=4)
+        ax.plot(df["year"], df["Newcomer Ratio F"], color="#fd21bb", lw=2.5, label="Female", linestyle="-", marker=".", zorder=4)
+        # ax.plot(df["year"], df["Newcomer Ratio O"], color="#8c564b", lw=2, label="Other", linestyle=":", zorder=4)
+
+        # --- Titles and labels ---
+        ax.set_title(f"Newcomer Ratios by Gender - {config.country}", fontweight="bold")
+        ax.set_xlabel("Year", fontweight="bold")
+        ax.set_ylabel("Newcomers / Competitors", fontweight="bold")
+
+        # --- X ticks ---
+        years = range(df["year"].min(), df["year"].max() + 1)
+        ax.set_xticks(years)
+        plt.setp(ax.get_xticklabels(), rotation=45, ha="center")
+
+        # --- Y axis ---
+        ax.set_ylim(bottom=0)
+
+        # --- Legend ---
+        ax.legend(loc="best")
+
+        # --- Final layout ---
+        fig.tight_layout()
+        plt.close(fig)
+
+        logger.info("Figure 'Newcomer Ratio' created successfully.")
+        return fig
+
+    except Exception as e:
+        logger.critical(f"Error creating Newcomer Ratio plot: {e}", exc_info=True)
+        return None
+
+
+def plot_gender_distribution_vert(
+    db_tables: dict,
+    config: configparser.ConfigParser,
+    logger: logging.Logger
+) -> plt.Figure:
+    """
+    Plot gender-based competitor and newcomer trends per year.
+    Creates three vertically stacked subplots: Male, Female, and Other.
+    """
+
+    try:
+        logger.info("Creating gender-based competitor distribution plot...")
+
+        # --- Load data ---
+        if "newcomers" not in db_tables:
+            logger.critical("'newcomers' table not found in db_tables.")
+            return None
+
+        df = db_tables["newcomers"].query("year > 2000")
+
+        # --- Create figure and axes ---
+        fig, (ax_m, ax_f) = plt.subplots(2, sharex=True, figsize=(10, 12))
+        fig.suptitle(f"Number of Unique Competitors by Gender - {config.nationality}", fontweight="bold")
+
+        # --- Common grid style ---
+        def style_ax(ax):
+            ax.grid(which="major", axis="y", zorder=1)
+            ax.set_axisbelow(True)
+            ax.tick_params(axis="y", labelsize=9)
+
+        # --- Male panel ---
+        style_ax(ax_m)
+        ax_m.bar(df["year"], df["Competitors M"], color="#4169e1", zorder=2, label="Male Competitors")
+        ax_m.bar(df["year"], df["Newcomer M"], color="#73c2fb", zorder=3, label="Male Newcomers")
+        ax_m.legend()
+        ax_m.set_ylabel("Competitors", fontweight="bold")
+
+        # --- Female panel ---
+        style_ax(ax_f)
+        ax_f.bar(df["year"], df["Competitors F"], color="#e0115f", zorder=2, label="Female Competitors")
+        ax_f.bar(df["year"], df["Newcomer F"], color="#ffb6c1", zorder=3, label="Female Newcomers")
+        ax_f.legend()
+        ax_f.set_ylabel("Competitors", fontweight="bold")
+
+        # --- X-axis formatting ---
+        years = range(df["year"].min(), df["year"].max() + 1)
+        ax_m.set_xticks(years)
+        ax_f.set_xticks(years)
+        plt.setp(ax_f.get_xticklabels(), rotation=45, ha="center", fontsize = 10)
+
+
+        # --- Footnote for "Other" competitors ---
+        nonzero_years = df.loc[df["Newcomer O"] > 0, "year"].tolist()
+        if nonzero_years:
+            years_text = ", ".join(map(str, nonzero_years))
+            total_competitors = df['Newcomer O'].sum().astype(int)
+            note = f"{total_competitors} total competitors who identify as 'other' competed in: {years_text}."
+        else:
+            note = "No competitors who identify as 'other' have been recorded yet."
+
+        fig.text(
+            0.5, 0.005,  # centered at bottom
+            note,
+            ha="center",
+            fontsize=9,
+            color="dimgray",
+            style="italic"
+        )
+
+        # --- Layout and return ---
+        fig.tight_layout()
+        fig.subplots_adjust(top=0.93)
+        plt.close(fig)
+
+        logger.info("Gender distribution plot created successfully.")
+        return fig
+
+    except Exception as e:
+        logger.critical(f"Error creating gender distribution plot: {e}", exc_info=True)
+        return None
+
+
+def plot_gender_distribution_area(
+    db_tables: dict,
+    config: configparser.ConfigParser,
+    logger: logging.Logger
+) -> plt.Figure:
+    """
+    Stacked area chart showing percentage distribution of genders across years.
+    """
+
+    try:
+        logger.info("Creating stacked area chart for gender share over time...")
+
+        if "newcomers" not in db_tables:
+            logger.critical("'newcomers' table not found in db_tables.")
+            return None
+
+        df = db_tables["newcomers"].query("year > 2000").copy()
+
+        # --- Compute percentage per gender ---
+        df["Male %"] = df["Competitors M"] / df["Competitors"] * 100
+        df["Female %"] = df["Competitors F"] / df["Competitors"] * 100
+        df["Other %"] = df["Competitors O"] / df["Competitors"] * 100
+
+        # --- Create the stacked area plot ---
+        fig, ax = plt.subplots(figsize=(10, 6))
+        ax.stackplot(
+            df["year"],
+            df["Male %"],
+            df["Female %"],
+            df["Other %"],
+            colors=["#4169e1", "#e0115f", "#9370db"],
+            labels=["Male", "Female", "Other"],
+            alpha=0.9
+        )
+
+        ax.set_title(f"Gender Distribution Among Competitors - {config.nationality}", fontweight="bold")
+        ax.set_ylabel("Percentage of Competitors", fontweight="bold")
+        ax.set_ylim(0, 100)
+        ax.grid(visible=False)
+
+        # --- Format ticks ---
+        years = range(df["year"].min(), df["year"].max() + 1)
+        ax.set_xticks(years)
+        plt.setp(ax.get_xticklabels(), rotation=45, ha="center")
+
+        # --- Move legend below the chart ---
+        ax.legend(
+            loc="upper center",
+            bbox_to_anchor=(0.5, -0.12),
+            ncol=3, 
+            frameon=False,
+            fontsize=10
+        )
+
+        fig.tight_layout()
+        fig.subplots_adjust(bottom=0.18)  # extra space for legend
+        plt.close(fig)
+
+        logger.info("Stacked area gender distribution plot created successfully.")
+        return fig
+
+    except Exception as e:
+        logger.critical(f"Error creating stacked area gender distribution plot: {e}", exc_info=True)
 
 
 ###################################################################
@@ -449,10 +721,10 @@ def run(db_tables, config):
 
     figures = {
         "Competition Distribution": plot_competition_distribution(db_tables=db_tables, config=config, logger=logger),
-        # "Competitor Distribution": plot_competitor_distribution(db_tables=db_tables, config=config, logger=logger),
-        # "Newcomer Ratio": plot_newcomers_ratio(db_tables=db_tables, config=config, logger=logger),
-        # "Female Presence at Competitions": plot_female_distribution(db_tables=db_tables, config=config, logger=logger)
-
+        "Competitor Distribution": plot_unique_competitor_distribution(db_tables=db_tables, config=config, logger=logger),
+        "Newcomer Ratio": plot_newcomers_ratio(db_tables=db_tables, config=config, logger=logger),
+        "Competitor Distribution by gender": plot_gender_distribution_vert(db_tables=db_tables, config=config, logger=logger),
+        "Gender distribution": plot_gender_distribution_area(db_tables=db_tables, config=config, logger=logger),
     }
 
     section_name = __name__.split(".")[-1]
