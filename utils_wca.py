@@ -309,6 +309,9 @@ def process_tables(db_tables: dict[str, pd.DataFrame], config: configparser.Conf
 
     logger.info("Preprocessing tables...")
 
+    nationality_filter = config.nationality
+    country_filter = config.country
+
     # --- Merge results with competitions + filter for nationality ---
     try:  
         # Rename column in competitions
@@ -317,8 +320,7 @@ def process_tables(db_tables: dict[str, pd.DataFrame], config: configparser.Conf
         logger.info("Renamed column name to competitionName in competitions dataframe")
 
         # Filter for nationality
-        nationality_filter = config.nationality
-        results_filtered = db_tables["results"].query("personCountryId == @nationality_filter")
+        results_filtered = db_tables["results"].query("personCountryId == @nationality_filter").copy()
         
         df = (
             results_filtered
@@ -344,8 +346,7 @@ def process_tables(db_tables: dict[str, pd.DataFrame], config: configparser.Conf
         db_tables["results_nationality"] = df
 
         # Filter for host country
-        country_filter = config.country
-        competitions_filtered = db_tables["competitions"].query("countryId == @country_filter")
+        competitions_filtered = db_tables["competitions"].query("countryId == @country_filter").copy()
 
         df = (
             db_tables["results"]
@@ -368,6 +369,9 @@ def process_tables(db_tables: dict[str, pd.DataFrame], config: configparser.Conf
 
         db_tables["results_country"] = df
 
+        #persons
+        db_tables["persons_nationality"] = db_tables["persons"].query("countryId == @nationality_filter").copy()
+
         logger.info(f"Created 'results_nationality' from results+competitions with only competitors from country = {nationality_filter}.")
         logger.info(f"Created 'results_country' from results+competitions with only competitions from country = {country_filter}.")
 
@@ -388,7 +392,7 @@ def process_tables(db_tables: dict[str, pd.DataFrame], config: configparser.Conf
         logger.critical(f"Error during the listing of championships for championship type {config.championship_type}: {e}", exc_info=True)
 
 
-    # --- Merge persons with ranks single ---
+    # --- Merge persons with ranks single + filter for nationality ---
     try:
         db_tables["ranks_single"] = (
             db_tables["ranks_single"]
@@ -400,7 +404,11 @@ def process_tables(db_tables: dict[str, pd.DataFrame], config: configparser.Conf
             )
             .drop('id', axis=1)
         )
+
+        db_tables["ranks_single_nationality"] = db_tables["ranks_single"].query("countryId == @nationality_filter").copy()
+
         logger.info("Merged persons with ranks_single")
+        logger.info(f"Created 'ranks_single_nationality' with only competitors from country = {nationality_filter}.")
 
     except Exception as e:
         logger.critical(f"Error during ranks_single/persons merge: {e}", exc_info=True)
@@ -418,7 +426,11 @@ def process_tables(db_tables: dict[str, pd.DataFrame], config: configparser.Conf
             )
             .drop('id', axis=1)
         )
+
+        db_tables["ranks_average_nationality"] = db_tables["ranks_average"].query("countryId == @nationality_filter").copy()
+
         logger.info("Merged persons with ranks_average")
+        logger.info(f"Created 'ranks_average_nationality' with only competitors from country = {nationality_filter}.")
 
     except Exception as e:
         logger.critical(f"Error during ranks_average/persons merge: {e}", exc_info=True)

@@ -1,9 +1,6 @@
-from pathlib import Path
 import pandas as pd
 import utils_wca as uw
 import matplotlib.pyplot as plt
-import matplotlib.ticker as mticker
-from datetime import datetime
 import configparser
 import logging
 
@@ -22,7 +19,7 @@ def compute_most_competitions(
         logger.info("Computing most competitions per competitor...")
 
         results = db_tables["results_nationality"]
-        persons = db_tables["persons"]
+        persons = db_tables["persons_nationality"]
 
         # Count unique competitions per competitor
         df_counts = (
@@ -67,7 +64,7 @@ def compute_most_countries(
         logger.info("Computing most countries per competitor...")
 
         results = db_tables["results_nationality"]
-        persons = db_tables["persons"]
+        persons = db_tables["persons_nationality"]
 
         # Count unique countries per competitor
         df_counts = (
@@ -114,7 +111,7 @@ def compute_most_competitors(
 
         results = db_tables["results_country"]
 
-        # Count unique countries per competitor
+        # Count unique competitors per competition
         df = (
             results
             .groupby("competitionId")["personId"]
@@ -257,7 +254,7 @@ def compute_newcomer_statistics(
         nationality = config.nationality
         df_n = db_tables["results_nationality"].copy() #df_nationality
         df_c = db_tables["results_country"].copy() #df_country
-        persons = db_tables["persons"][["id", "gender"]]
+        persons = db_tables["persons_nationality"][["id", "gender"]]
 
         logger.info(f"Computing yearly newcomer statistics for nationality={nationality} (with gender breakdown)")
 
