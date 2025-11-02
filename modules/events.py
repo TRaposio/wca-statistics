@@ -20,8 +20,8 @@ def compute_most_events_won(
         logger.info(f"Computing most events won for competitors from {config.nationality}...")
 
         # --- Load data ---
-        results = db_tables["results_nationality"].copy()
-        persons = db_tables["persons_nationality"][["id", "name"]].drop_duplicates()
+        results = db_tables["results_fixed"].copy()
+        persons = db_tables["persons"][["id", "name"]].drop_duplicates()
 
         # Replace invalid results and drop NaN
         golds = (
@@ -76,13 +76,13 @@ def compute_most_events_podiumed(
         logger.info(f"Computing most events podiumed for competitors from {config.nationality}...")
 
         # --- Load data ---
-        results = db_tables["results_nationality"].copy()
-        persons = db_tables["persons_nationality"][["id", "name"]].drop_duplicates()
+        results = db_tables["results_fixed"].copy()
+        persons = db_tables["persons"][["id", "name"]].drop_duplicates()
 
         # Replace invalid results and drop NaN
         podiums = (
             results
-            .query("roundTypeId in ['f', 'c'] & pos >= 3")      # podium finishers in finals
+            .query("roundTypeId in ['f', 'c'] & pos <= 3")      # podium finishers in finals
             .replace([0, -1, -2], np.nan)
             .dropna(subset=["best"])        # must win with a result
             .groupby("personId")["eventId"]
@@ -134,10 +134,10 @@ def compute_event_participation_percentage(
 
         # --- Load pre-filtered data ---
         results = db_tables["results_nationality"].copy()
-        persons = db_tables["persons_nationality"].copy()
+        persons = db_tables["persons"]
 
         # --- Total number of competitors for this nationality ---
-        total_competitors = persons["id"].nunique()
+        total_competitors = persons.query("countryId == @config.nationality")["id"].nunique()
 
         if total_competitors == 0:
             logger.warning(f"No competitors found for nationality '{config.nationality}'. Returning empty DataFrame.")
@@ -312,10 +312,9 @@ def compute_bronze_membership(
         logger.info(f"Computing Bronze Membership for competitors from {nationality}...")
 
         # --- Load data ---
-        results = db_tables["results_nationality"].copy()
+        results = db_tables["results_fixed"].copy()
         persons = db_tables["persons"].copy()
 
-        # --- Exclude retired events ---
         events = config.current_events
         num_events_needed = len(events)
 
@@ -359,6 +358,7 @@ def compute_bronze_membership(
         # --- Merge with names ---
         bronze = (
             persons[["id", "name"]]
+            .drop_duplicates()
             .merge(last_event_date, left_on="id", right_on="personId", how="inner")
             .drop(columns="personId")
             .rename(columns={"id": "WCAID", "name": "Name"})
@@ -372,7 +372,87 @@ def compute_bronze_membership(
         return bronze
 
     except Exception as e:
-        logger.critical(f"Error computing average events per competition: {e}", exc_info=True)
+        logger.critical(f"Error computing competitors that achieved Bronze Membership: {e}", exc_info=True)
+
+
+def compute_silver_membership(
+    db_tables: dict,
+    config: configparser.ConfigParser,
+    logger: logging.Logger
+) -> pd.DataFrame:
+    
+    """
+    List of competitors with a silver membership: an official average in all current WCA Events.
+    """
+
+    try:
+        nationality = config.nationality
+        logger.info(f"Computing Silver Membership for competitors from {nationality}...")
+
+        # --- Load data ---
+        results = db_tables["results_fixed"].copy()
+        persons = db_tables["persons"].copy()
+
+        events = [e for e in config.current_events if e != '333mbf']
+        num_events_needed = len(events)
+
+        # --- Filter valid results ---
+        first_result_date = (
+            results
+            .query("average > 0 and eventId in @events")
+            .sort_values("date")
+            .groupby(["personId", "eventId"], observed=True, as_index=False)
+            .first()  # earliest average for each event
+        )
+
+        # --- Count unique events completed per person ---
+        events_per_person = (
+            first_result_date
+            .groupby("personId", observed=True)["eventId"]
+            .nunique()
+            .rename("num_events")
+            .reset_index()
+        )
+
+        # --- Identify silver members ---
+        silver_ids = (
+            events_per_person.query("num_events == @num_events_needed")["personId"].tolist()
+        )
+
+        if not silver_ids:
+            logger.info("No silver members found.")
+            return pd.DataFrame(columns=["WCAID", "Name", "Last Event", "Completion Date"])
+
+        # --- Find when each bronze member completed their last required event ---
+        last_event_date = (
+            first_result_date[first_result_date["personId"].isin(silver_ids)]
+            .sort_values("date", ascending=False)
+            .groupby("personId", observed=True, as_index=False)
+            .first()
+            [["personId", "eventId", "date"]]
+            .rename(columns={"eventId": "Last Event", "date": "Completion Date"})
+        )
+
+        # --- Merge with names ---
+        silver = (
+            persons[["id", "name"]]
+            .drop_duplicates()
+            .merge(last_event_date, left_on="id", right_on="personId", how="inner")
+            .drop(columns="personId")
+            .rename(columns={"id": "WCAID", "name": "Name"})
+            .sort_values("Completion Date", ascending=True)
+            .reset_index(drop=True)
+        )
+
+        silver.index += 1
+
+        db_tables["silver"] = silver
+
+        logger.info(f"Identified {len(silver)} silver members from {nationality}.")
+        return silver
+
+    except Exception as e:
+        logger.critical(f"Error computing competitors that achieved Silver Membership: {e}", exc_info=True)
 
 
 ###################################################################
@@ -395,7 +475,7 @@ def run(db_tables, config):
         "Avg Events per Competition": compute_average_events_per_competition(db_tables=db_tables, config=config, logger=logger),
         "Most Participated Competitions": compute_most_participated_competition(db_tables=db_tables, config=config, logger=logger),
         "Bronze Membership": compute_bronze_membership(db_tables=db_tables, config=config, logger=logger),
-        # "Silver Membership": compute_silver_membership(db_tables=db_tables, config=config, logger=logger),
+        "Silver Membership": compute_silver_membership(db_tables=db_tables, config=config, logger=logger),
         # "Gold Membership": compute_gold_membership(db_tables=db_tables, config=config, logger=logger),
         # "Platinum Membership": compute_platinum_membership(db_tables=db_tables, config=config, logger=logger),
     }

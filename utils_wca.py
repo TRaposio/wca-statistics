@@ -290,29 +290,17 @@ def read_table(table_name: str, config: configparser.ConfigParser, logger: loggi
     return df
 
 
-def process_tables(db_tables: dict[str, pd.DataFrame], config: configparser.ConfigParser, logger: logging.Logger) -> dict[str, pd.DataFrame]:
+def make_localized_results_df(db_tables: dict, config: configparser.ConfigParser, logger: logging.Logger):
+    
     """
-    Perform common operations on db_tables. e.g. Merges the 'results' and 'competitions' tables on 'competitionId' and filters rows to include only competitors from the configured country.
-
-    Parameters
-    ----------
-    db_tables : dict[str, pd.DataFrame]
-        Dictionary containing loaded WCA .tsv tables.
-    config : ConfigParser
-        Configuration object loaded with load_config().
-    logger : logging.Logger, optional
-
-    Returns
-    -------
-    dict[str, pd.DataFrame]
+    Create 'results_nationality' — same as results, but with all personCountryId values
+    filtered by the nationality of config - and 'results_country' - same as results, 
+    but with all competitionId filtered by the country of config
     """
-
-    logger.info("Preprocessing tables...")
 
     nationality_filter = config.nationality
     country_filter = config.country
-
-    # --- Merge results with competitions + filter for nationality ---
+    
     try:  
         # Rename column in competitions
         db_tables["competitions"] = db_tables["competitions"].rename(columns = {'name':'competitionName'})
@@ -369,35 +357,85 @@ def process_tables(db_tables: dict[str, pd.DataFrame], config: configparser.Conf
 
         db_tables["results_country"] = df
 
-        #persons
-        db_tables["persons_nationality"] = db_tables["persons"].query("countryId == @nationality_filter").copy()
-
         logger.info(f"Created 'results_nationality' from results+competitions with only competitors from country = {nationality_filter}.")
         logger.info(f"Created 'results_country' from results+competitions with only competitions from country = {country_filter}.")
 
     except Exception as e:
-        logger.critical(f"Error during results/competitions merge: {e}", exc_info=True)
-    
+        logger.critical(f"Error creating localized results dataframes: {e}", exc_info=True)
 
-    # --- Extract list of championships ---
+
+def fix_results_nationality(db_tables: dict, config: configparser.ConfigParser, logger: logging.Logger):
+    
+    """
+    Create 'results_fixed' — same as results_nationality, but with all personCountryId values
+    replaced by the competitor's latest nationality (subid=1).
+    """
+    
     try:
-        config.nats = (
-            list(
-                db_tables["championships"][db_tables["championships"]['championship_type'] == config.championship_type]['competition_id']
-            )
+        persons = db_tables["persons"]
+        results = db_tables["results"].copy()
+        competitions = db_tables["competitions"]
+        rounds = db_tables["rounds"][['id','rank']]
+
+        logger.info("Creating results_fixed with standardized nationality (subid=1)...")
+
+        # Build mapping from personId → latest countryId
+        nat_map = (
+            persons.loc[persons["subid"] == 1, ["id", "countryId"]]
+            .drop_duplicates(subset="id")
+            .set_index("id")["countryId"]
+            .to_dict()
         )
-        logger.info("extracted list of national championships")
+
+        # Replace nationality efficiently
+        results["personCountryId"] = results["personId"].map(nat_map).fillna(results["personCountryId"])
+
+        # Recreate results_nationality
+        df = (
+            results
+            .query("personCountryId == @config.nationality")
+            .merge(
+                competitions,
+                left_on="competitionId",
+                right_on="id",
+                how="left",
+                validate = "m:1"
+            )
+            .drop('id', axis=1)
+            .merge(
+                rounds,
+                how='left',
+                left_on='roundTypeId',
+                right_on='id'
+            )
+            .drop('id', axis=1)
+        )
+
+        df['date'] = pd.to_datetime(df[['year','month','day']])
+
+        db_tables["results_fixed"] = df
+        logger.info("Added 'results_fixed' to db_tables.")
 
     except Exception as e:
-        logger.critical(f"Error during the listing of championships for championship type {config.championship_type}: {e}", exc_info=True)
+        logger.critical(f"Error creating results_fixed: {e}", exc_info=True)
+        return db_tables
 
 
-    # --- Merge persons with ranks single + filter for nationality ---
+def make_localized_rankings(db_tables: dict, config: configparser.ConfigParser, logger: logging.Logger):
+
+    """
+    Filter ranks_single and ranks_average for the given nationality
+    """
+
+    nationality_filter = config.nationality
+
+    persons = db_tables["persons"][['id','name','countryId']].query("subid == 1")
+
     try:
         db_tables["ranks_single"] = (
             db_tables["ranks_single"]
             .merge(
-                db_tables["persons"][['id','name','countryId']], 
+                persons, 
                 how='left', 
                 left_on='personId', 
                 right_on='id'
@@ -413,13 +451,11 @@ def process_tables(db_tables: dict[str, pd.DataFrame], config: configparser.Conf
     except Exception as e:
         logger.critical(f"Error during ranks_single/persons merge: {e}", exc_info=True)
 
-
-    # --- Merge persons with ranks average ---
     try:
         db_tables["ranks_average"] = (
             db_tables["ranks_average"]
             .merge(
-                db_tables["persons"][['id','name','countryId']], 
+                persons, 
                 how='left', 
                 left_on='personId', 
                 right_on='id'
@@ -435,12 +471,29 @@ def process_tables(db_tables: dict[str, pd.DataFrame], config: configparser.Conf
     except Exception as e:
         logger.critical(f"Error during ranks_average/persons merge: {e}", exc_info=True)
 
+
+def process_tables(db_tables: dict[str, pd.DataFrame], config: configparser.ConfigParser, logger: logging.Logger) -> dict[str, pd.DataFrame]:
+    
+    """
+    Perform common operations on db_tables. e.g. Merges the 'results' and 'competitions' tables on 'competitionId' and filters rows to include only competitors from the configured country.
+    """
+
+    logger.info("Preprocessing tables...")
+       
+    make_localized_results_df(db_tables, config, logger)
+    fix_results_nationality(db_tables, logger)
+    make_localized_rankings(db_tables, config, logger)
+
+    # --- Extract list of championships ---
+    try:
+        config.nats = list(db_tables["championships"][db_tables["championships"]['championship_type'] == config.championship_type]['competition_id'])
+        logger.info("extracted list of national championships")
+
+    except Exception as e:
+        logger.critical(f"Error during the listing of championships for championship type {config.championship_type}: {e}", exc_info=True)
+
     # Useful country lists
-    config.countries = (
-        list(
-            db_tables["competitions"]['countryId'].drop_duplicates()
-        )
-    )
+    config.countries = list(db_tables["competitions"]['countryId'].drop_duplicates())
     config.real_countries = [x for x in config.countries if x not in config.multivenue]
 
     return db_tables

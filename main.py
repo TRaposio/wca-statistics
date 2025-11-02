@@ -14,6 +14,7 @@ def main():
     uw.update_data(config=config, logger=logger)
 
     # --- Load all common tables once ---
+
     tables_to_load = [
         "results", 
         "competitions", 
@@ -30,7 +31,8 @@ def main():
     db_tables = uw.process_tables(db_tables, config, logger)
 
     # --- Run modules, passing the preloaded tables ---
-    #competitions.run(db_tables, config)
+
+    competitions.run(db_tables, config)
     events.run(db_tables, config)
     # sor_kinch.run(data, config, logger)
     # results.run(data, config, logger)

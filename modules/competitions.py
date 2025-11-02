@@ -18,8 +18,8 @@ def compute_most_competitions(
     try:
         logger.info("Computing most competitions per competitor...")
 
-        results = db_tables["results_nationality"]
-        persons = db_tables["persons_nationality"]
+        results = db_tables["results_fixed"]
+        persons = db_tables["persons"]
 
         # Count unique competitions per competitor
         df_counts = (
@@ -63,8 +63,8 @@ def compute_most_countries(
     try:
         logger.info("Computing most countries per competitor...")
 
-        results = db_tables["results_nationality"]
-        persons = db_tables["persons_nationality"]
+        results = db_tables["results_fixed"]
+        persons = db_tables["persons"]
 
         # Count unique countries per competitor
         df_counts = (
@@ -254,7 +254,7 @@ def compute_newcomer_statistics(
         nationality = config.nationality
         df_n = db_tables["results_nationality"].copy() #df_nationality
         df_c = db_tables["results_country"].copy() #df_country
-        persons = db_tables["persons_nationality"][["id", "gender"]]
+        persons = db_tables["persons"][["id", "gender"]]
 
         logger.info(f"Computing yearly newcomer statistics for nationality={nationality} (with gender breakdown)")
 
