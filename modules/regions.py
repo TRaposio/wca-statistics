@@ -111,7 +111,7 @@ def plot_italy_competition_distribution(
 
         logger.info("Creating Italian competition distribution map...")
 
-        comps = db_tables["competitions"].query("countryId == 'Italy'").copy()
+        comps = db_tables["competitions"].query("countryId == 'Italy' & cancelled == 0").copy()
         city_to_region = db_tables["regions"].copy()
 
         comps["date"] = pd.to_datetime(
@@ -229,9 +229,6 @@ def run(db_tables, config):
 
     else:
         logger.info("Producing stats for Events module")
-
-        uw.read_aux_file("regions", db_tables, config, logger)
-        uw.check_missing_regions(db_tables, config, logger)
 
         results = {
             "Most Regions": compute_most_regions(db_tables=db_tables, config=config, logger=logger),

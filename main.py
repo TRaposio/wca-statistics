@@ -14,7 +14,6 @@ def main():
     uw.update_data(config=config, logger=logger)
 
     # --- Load all common tables once ---
-
     tables_to_load = [
         "results", 
         "competitions", 
@@ -30,8 +29,14 @@ def main():
 
     db_tables = uw.process_tables(db_tables, config, logger)
 
-    # --- Run modules, passing the preloaded tables ---
+    # --- check if mappers must be updated ---
+    uw.read_aux_file("regions", db_tables, config, logger)
+    missing = uw.check_missing_regions(db_tables, config, logger)
 
+    if missing:
+        logger.critical(f"Found {len(missing)} unmapped competitions. These won't be counted in the stats unless mapped.")
+
+    # --- Run modules, passing the preloaded tables ---
     # competitions.run(db_tables, config)
     # events.run(db_tables, config)
     regions.run(db_tables, config)

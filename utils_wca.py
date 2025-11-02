@@ -555,7 +555,7 @@ def process_tables(db_tables: dict[str, pd.DataFrame], config: configparser.Conf
     return db_tables
 
 
-def check_missing_regions(db_tables: dict, config: configparser.ConfigParser, logger: logging.Logger | None = None):
+def check_missing_regions(db_tables: dict, config: configparser.ConfigParser, logger: logging.Logger | None = None) -> set: 
     """
     Check for competitions in the WCA database that are missing from the region mapping file.
     """
@@ -577,10 +577,10 @@ def check_missing_regions(db_tables: dict, config: configparser.ConfigParser, lo
     out_path = regions_dir / f"missing_region_mappings_ita.csv"
     pd.DataFrame(unmapped, columns=['cityName']).to_csv(out_path, index=False, sep=";")
 
-    logger.warning(f"Found {len(unmapped)} unmapped competitions. These won't be counted in the stats unless mapped.")
     logger.info(f"Saved missing mapping list to: {out_path}")
 
     return unmapped
+
 
 def export_data(results: dict, figures: dict | None, section_name: str, config: configparser.ConfigParser, logger: logging.Logger | None = None) -> dict:
     """
@@ -686,9 +686,4 @@ def timeconvert(x: float) -> str:
         if a < 1000:
             return f"{int(x / 6000)}:0{a / 100:.2f}"
         return f"{int(x / 6000)}:{a / 100:.2f}"
-
-def load_regions_table(db_tables: dict[str, pd.DataFrame], config: configparser.ConfigParser, logger: logging.Logger):
-    """
-    Load the italian_cities.csv file for regional statistics
-    """
 
