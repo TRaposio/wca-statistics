@@ -1,6 +1,6 @@
 # main.py
 import utils_wca as uw
-from modules import competitions, events#, results, records, italian_championship, relays, sor_kinch
+from modules import competitions, events, regions#, results, records, italian_championship, relays, sor_kinch
 
 def main():
     
@@ -32,8 +32,9 @@ def main():
 
     # --- Run modules, passing the preloaded tables ---
 
-    competitions.run(db_tables, config)
-    events.run(db_tables, config)
+    # competitions.run(db_tables, config)
+    # events.run(db_tables, config)
+    regions.run(db_tables, config)
     # sor_kinch.run(data, config, logger)
     # results.run(data, config, logger)
     # records.run(data, config, logger)

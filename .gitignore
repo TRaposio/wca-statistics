@@ -40,5 +40,5 @@ Thumbs.db
 readme_backup.txt
 
 # Temporary ignore
-data/df_regioni.csv
+data/regions/missing_region_mappings_ita.csv
 misc/

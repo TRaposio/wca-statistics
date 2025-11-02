@@ -214,6 +214,19 @@ def get_database_dir(config: configparser.ConfigParser) -> Path:
     return db_dir
 
 
+def get_regions_dir(config: configparser.ConfigParser) -> Path:
+    """
+    Return the path to the regions directory, creating it if needed.
+    """
+    try:
+        reg_dir = Path(config["paths"]["regions_dir"]).resolve()
+    except KeyError:
+        raise KeyError("Missing [paths] -> regions_dir in config.ini")
+
+    reg_dir.mkdir(parents=True, exist_ok=True)
+    return reg_dir
+
+
 def update_data(config: configparser.ConfigParser, logger: logging.Logger | None = None) -> None:
     """
     Download the latest WCA export if not already downloaded today.
@@ -287,6 +300,49 @@ def read_table(table_name: str, config: configparser.ConfigParser, logger: loggi
     else:
         print(f"Loaded '{table_name}' from {file_path.name} ({len(df):,} rows)")
 
+    return df
+
+
+def read_aux_file(file_key: str, db_tables: dict, config: configparser.ConfigParser, logger: logging.Logger) -> pd.DataFrame:
+    """
+    Reads auxiliary .csv files defined in [aux_files] section of config.ini
+    and stores them into db_tables under the same key.
+
+    Example
+    -------
+    read_aux_file("regions", db_tables, config, logger)
+    -> loads ./data/regions/ita_city_to_region_map.csv into db_tables["regions"]
+    """
+
+    # --- Validate config ---
+    if not config.has_section("aux_files"):
+        logger.critical("Missing [aux_files] section in config.ini")
+    aux_files = dict(config.items("aux_files"))
+
+    if file_key not in aux_files:
+        logger.critical(f"File key '{file_key}' not found in [aux_files] section of config.ini")
+
+    file_name = aux_files[file_key]
+
+    # --- Determine path by file_key ---
+    if file_key == "regions":
+        base_dir = get_regions_dir(config)
+        sep = ";"
+    else:
+        logger.critical(f"No handler defined for auxiliary file '{file_key}'")
+
+    file_path = base_dir / file_name
+
+    # --- Check file existence ---
+    if not file_path.exists():
+        logger.critical(f"Auxiliary file not found: {file_path}")
+
+    # --- Load CSV ---
+    df = pd.read_csv(file_path, sep=sep)
+
+    # --- Save to db_tables ---
+    db_tables[file_key] = df
+    logger.info(f"Loaded auxiliary file '{file_key}' from {file_path.name} ({len(df):,} rows)")
     return df
 
 
@@ -499,23 +555,36 @@ def process_tables(db_tables: dict[str, pd.DataFrame], config: configparser.Conf
     return db_tables
 
 
+def check_missing_regions(db_tables: dict, config: configparser.ConfigParser, logger: logging.Logger | None = None):
+    """
+    Check for competitions in the WCA database that are missing from the region mapping file.
+    """
+
+    competitions = db_tables["competitions"].query("countryId == @config.country").copy()
+    mapping = db_tables["regions"]
+
+    # --- Find unmapped competitionIds ---
+    mapped_ids = set(mapping["cityName"])
+    unmapped = set(competitions.loc[~(competitions["cityName"].isin(mapped_ids)), "cityName"])
+    unmapped.remove('Multiple cities')
+
+    if not unmapped:
+        logger.info("All Italian competitions have a region assigned. No missing mappings.")
+
+    # --- Save to CSV ---
+    regions_dir = get_regions_dir(config)
+
+    out_path = regions_dir / f"missing_region_mappings_ita.csv"
+    pd.DataFrame(unmapped, columns=['cityName']).to_csv(out_path, index=False, sep=";")
+
+    logger.warning(f"Found {len(unmapped)} unmapped competitions. These won't be counted in the stats unless mapped.")
+    logger.info(f"Saved missing mapping list to: {out_path}")
+
+    return unmapped
+
 def export_data(results: dict, figures: dict | None, section_name: str, config: configparser.ConfigParser, logger: logging.Logger | None = None) -> dict:
     """
     Export module results: Excel + optional figures.
-
-    Parameters
-    ----------
-    results : dict
-        Dictionary {sheet_name: DataFrame} for Excel sheets.
-    figures : dict, optional
-        Dictionary {figure_name: matplotlib.figure.Figure} to save.
-    section_name : str
-        Name of the module/section.
-    config : ConfigParser
-        Loaded config.ini object.
-    logger : logging.Logger, optional
-        Logger for messages.
-
     """
 
     # --- Timestamp ---
@@ -617,3 +686,9 @@ def timeconvert(x: float) -> str:
         if a < 1000:
             return f"{int(x / 6000)}:0{a / 100:.2f}"
         return f"{int(x / 6000)}:{a / 100:.2f}"
+
+def load_regions_table(db_tables: dict[str, pd.DataFrame], config: configparser.ConfigParser, logger: logging.Logger):
+    """
+    Load the italian_cities.csv file for regional statistics
+    """
+
