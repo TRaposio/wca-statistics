@@ -455,6 +455,176 @@ def compute_silver_membership(
         logger.critical(f"Error computing competitors that achieved Silver Membership: {e}", exc_info=True)
 
 
+def compute_gold_membership(
+    db_tables: dict,
+    config: configparser.ConfigParser,
+    logger: logging.Logger
+) -> pd.DataFrame:
+    """
+    Compute Gold Membership:
+    Competitors who are Silver Members and have achieved either
+    a World Championship podium, a Continental Record, or a World Record.
+    """
+
+    try:
+        nationality = config.nationality
+        logger.info(f"Computing Gold Membership for competitors from {nationality} ...")
+
+        results = db_tables["results_fixed"]
+        persons = db_tables["persons"]
+        silver = db_tables.get("silver", pd.DataFrame())
+        championships = db_tables["championships"]
+
+        # --- Sanity check ---
+        if silver.empty:
+            logger.warning("No silver members found — gold membership cannot be computed.")
+            return pd.DataFrame(columns=["WCAID", "Name", "Gold Condition"])
+
+        # --- Build lookup sets ---
+        silver_ids = set(silver["WCAID"])
+
+        # --- World Championship podiums ---
+        wc_ids = set(
+            championships.loc[
+                championships["championship_type"].str.endswith("world"), "competition_id"
+            ]
+        )
+        wc_podium = results.query("competitionId in @wc_ids and pos <= 3")["personId"].unique()
+        wc_podium_set = set(wc_podium)
+
+        # --- Continental / World records ---
+        record_cols = ["regionalSingleRecord", "regionalAverageRecord"]
+        record_df = results[record_cols + ["personId"]].copy()
+
+        has_wr = record_df[
+            record_df[record_cols].apply(lambda x: x.str.contains("WR", na=False)).any(axis=1)
+        ]["personId"].unique()
+
+        has_cr = record_df[
+            record_df[record_cols].apply(
+                lambda x: x.notna() & ~x.str.contains("WR|NR", na=False)
+            ).any(axis=1)
+        ]["personId"].unique()
+
+        wr_set = set(has_wr)
+        cr_set = set(has_cr)
+
+        # --- Combine flags ---
+        gold_ids = [
+            pid for pid in silver_ids
+            if pid in wc_podium_set or pid in wr_set or pid in cr_set
+        ]
+
+        if not gold_ids:
+            logger.info("No gold members found.")
+            return pd.DataFrame(columns=["WCAID", "Name", "Gold Condition"])
+
+        # --- Build final DataFrame ---
+        def gold_condition(pid):
+            conds = []
+            if pid in wc_podium_set: conds.append("World Championship Podium")
+            if pid in wr_set: conds.append("World Record")
+            if pid in cr_set: conds.append("Continental Record")
+            return ", ".join(conds)
+
+        gold = (
+            persons[["id", "name"]]
+            .drop_duplicates()
+            .query("id in @gold_ids")
+            .rename(columns={"id": "WCAID", "name": "Name"})
+        )
+        gold["Gold Condition"] = gold["WCAID"].apply(gold_condition)
+
+        gold.index = range(1, len(gold) + 1)
+
+        logger.info(f"Identified {len(gold)} Gold Members.")
+        return gold
+
+    except Exception as e:
+        logger.critical(f"Error computing gold membership: {e}", exc_info=True)
+
+
+def compute_platinum_membership(
+    db_tables: dict,
+    config: configparser.ConfigParser,
+    logger: logging.Logger
+) -> pd.DataFrame:
+    """
+    Compute Platinum Membership:
+    Competitors who are Silver Members and have achieved
+    a World Championship podium, a Continental Record and a World Record.
+    """
+
+    try:
+        nationality = config.nationality
+        logger.info(f"Computing Platinum Membership for competitors from {nationality} ...")
+
+        results = db_tables["results_fixed"]
+        persons = db_tables["persons"]
+        silver = db_tables.get("silver", pd.DataFrame())
+        championships = db_tables["championships"]
+
+        # --- Sanity check ---
+        if silver.empty:
+            logger.warning("No silver members found — platinum membership cannot be computed.")
+            return pd.DataFrame(columns=["WCAID", "Name"])
+
+        # --- Build lookup sets ---
+        silver_ids = set(silver["WCAID"])
+
+        # --- World Championship podiums ---
+        wc_ids = set(
+            championships.loc[
+                championships["championship_type"].str.endswith("world"), "competition_id"
+            ]
+        )
+        wc_podium = results.query("competitionId in @wc_ids and pos <= 3")["personId"].unique()
+        wc_podium_set = set(wc_podium)
+
+        # --- Continental / World records ---
+        record_cols = ["regionalSingleRecord", "regionalAverageRecord"]
+        record_df = results[record_cols + ["personId"]].copy()
+
+        has_wr = record_df[
+            record_df[record_cols].apply(lambda x: x.str.contains("WR", na=False)).any(axis=1)
+        ]["personId"].unique()
+
+        has_cr = record_df[
+            record_df[record_cols].apply(
+                lambda x: x.notna() & ~x.str.contains("WR|NR", na=False)
+            ).any(axis=1)
+        ]["personId"].unique()
+
+        wr_set = set(has_wr)
+        cr_set = set(has_cr)
+
+        # --- Combine flags ---
+        plat_ids = [
+            pid for pid in silver_ids
+            if pid in wc_podium_set and pid in wr_set and pid in cr_set
+        ]
+
+        if not plat_ids:
+            logger.info("No platinum members found.")
+            return pd.DataFrame(columns=["WCAID", "Name"])
+
+        platinum = (
+            persons[["id", "name"]]
+            .drop_duplicates()
+            .query("id in @plat_ids")
+            .rename(columns={"id": "WCAID", "name": "Name"})
+            .reset_index(drop=True)
+        )
+
+        platinum.index += 1
+
+        logger.info(f"Identified {len(platinum)} Platinum Members.")
+        return platinum
+
+    except Exception as e:
+        logger.critical(f"Error computing platinum membership: {e}", exc_info=True)
+
+
 ###################################################################
 ############################### RUN ###############################
 ###################################################################
@@ -476,17 +646,11 @@ def run(db_tables, config):
         "Most Participated Competitions": compute_most_participated_competition(db_tables=db_tables, config=config, logger=logger),
         "Bronze Membership": compute_bronze_membership(db_tables=db_tables, config=config, logger=logger),
         "Silver Membership": compute_silver_membership(db_tables=db_tables, config=config, logger=logger),
-        # "Gold Membership": compute_gold_membership(db_tables=db_tables, config=config, logger=logger),
-        # "Platinum Membership": compute_platinum_membership(db_tables=db_tables, config=config, logger=logger),
+        "Gold Membership": compute_gold_membership(db_tables=db_tables, config=config, logger=logger),
+        "Platinum Membership": compute_platinum_membership(db_tables=db_tables, config=config, logger=logger),
     }
 
-    figures = {
-        # "Competition Distribution": plot_competition_distribution(db_tables=db_tables, config=config, logger=logger),
-        # "Competitor Distribution": plot_unique_competitor_distribution(db_tables=db_tables, config=config, logger=logger),
-        # "Newcomer Ratio": plot_newcomers_ratio(db_tables=db_tables, config=config, logger=logger),
-        # "Competitor Distribution by gender": plot_gender_distribution_vert(db_tables=db_tables, config=config, logger=logger),
-        # "Gender distribution": plot_gender_distribution_area(db_tables=db_tables, config=config, logger=logger),
-    }
+    figures = {}
 
     section_name = __name__.split(".")[-1]
     uw.export_data(results, figures=figures, section_name=section_name, config=config, logger=logger)

@@ -695,6 +695,7 @@ def plot_gender_distribution_area(
         logger.critical(f"Error creating stacked area gender distribution plot: {e}", exc_info=True)
 
 
+
 ###################################################################
 ############################### RUN ###############################
 ###################################################################
