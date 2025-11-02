@@ -429,7 +429,7 @@ def make_localized_rankings(db_tables: dict, config: configparser.ConfigParser, 
 
     nationality_filter = config.nationality
 
-    persons = db_tables["persons"][['id','name','countryId']].query("subid == 1")
+    persons = db_tables["persons"].query("subid == 1")[['id','name','countryId']]
 
     try:
         db_tables["ranks_single"] = (
@@ -481,7 +481,7 @@ def process_tables(db_tables: dict[str, pd.DataFrame], config: configparser.Conf
     logger.info("Preprocessing tables...")
        
     make_localized_results_df(db_tables, config, logger)
-    fix_results_nationality(db_tables, logger)
+    fix_results_nationality(db_tables, config, logger)
     make_localized_rankings(db_tables, config, logger)
 
     # --- Extract list of championships ---
