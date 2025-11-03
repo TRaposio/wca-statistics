@@ -37,8 +37,8 @@ def main():
         logger.critical(f"Found {len(missing)} unmapped competitions. These won't be counted in the stats unless mapped.")
 
     # --- Run modules, passing the preloaded tables ---
-    # competitions.run(db_tables, config)
-    # events.run(db_tables, config)
+    competitions.run(db_tables, config)
+    events.run(db_tables, config)
     regions.run(db_tables, config)
     # sor_kinch.run(data, config, logger)
     # results.run(data, config, logger)

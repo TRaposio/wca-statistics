@@ -8,6 +8,7 @@ import geopandas as gpd
 from matplotlib.colors import LinearSegmentedColormap
 from pathlib import Path
 from datetime import datetime
+from shapely.geometry import Point, Polygon
 
 
 # Istat codes relative to shapefiles
@@ -92,6 +93,111 @@ def compute_most_regions(
 
     except Exception as e:
         logger.critical(f"Error computing regions visited: {e}", exc_info=True)
+
+
+def compute_average_win_times_by_region(
+    db_tables: dict,
+    config: configparser.ConfigParser,
+    logger: logging.Logger,
+    n_years: int = 2
+) -> pd.DataFrame:
+    """
+    Compute average winning times per event for each Italian region
+    considering only the past N years of competitions (default 2).
+
+    TODO: multi is broken, the function is not efficient. Probabily best to calculate multi points
+    """
+
+    try:
+        logger.info("Computing average regional winning times (past 2 years)...")
+
+        results = db_tables["results_country"].copy()
+        competitions = db_tables["competitions"].copy()
+        region_map = db_tables["regions"].copy()
+
+        # --- Filter for last two years ---
+        latest_date = results["date"].max()
+        cutoff = latest_date - pd.Timedelta(days=n_years * 365)
+        df = results.query("date >= @cutoff & pos == 1 & roundTypeId in ['c','f'] & best > 0").copy()
+        logger.info(f"Keeping results from {cutoff.date()} to {latest_date.date()}.")
+
+        # --- Merge with region mapping ---
+        df = df.merge(region_map[["cityName", "regionName"]], on="cityName", how="left")
+
+        # --- Handle metric selection ---
+        # Special handling for 333fm based on formatId
+        df["eventId"] = np.where(
+            (df["eventId"] == "333fm") & (df["formatId"] == "1"),
+            "333fm_1",
+            np.where(
+                (df["eventId"] == "333fm") & (df["formatId"] == "m"),
+                "333fm_m",
+                df["eventId"]
+            )
+        )
+
+        # Special handling for multi: calculate points
+        df["best"] = np.where(
+            df["eventId"] == "333mbf",
+            df["best"].apply(uw.multisolved) - df["best"].apply(uw.multiwrong),
+            df["best"]
+        )
+
+        # --- Filter valid results ---
+        df["metric"] = np.where(
+            df["eventId"].isin(["333bf", "444bf", "555bf", "333mbf", "333fm_1"]),
+            df["best"],
+            df["average"]
+        )
+
+        # Keep only valid (positive) results
+        df = df[df["metric"] > 0]
+
+        # --- Compute average per region and event ---
+        region_event_avg = (
+            df.groupby(["regionName", "eventId"], observed=True)["metric"]
+            .mean()
+            .reset_index()
+        )
+
+         # --- Post-process metrics by event type ---
+        def convert_metric(row):
+            event = row["eventId"]
+            val = row["metric"]
+
+            if pd.isna(val) or val <= 0:
+                return np.nan
+
+            # Fewest Moves → convert to moves (divide by 100)
+            if event == "333fm_m":
+                return str(val / 100)
+
+            # All others → convert centiseconds to seconds/minutes
+            elif event not in ['333', '333fm_1', '333mbf']:
+                return uw.timeconvert(val)
+            
+            # 333 later because I need to sort
+            else:
+                return val
+
+        region_event_avg["metric"] = region_event_avg.apply(convert_metric, axis = 1) ### loops,
+
+        # --- Pivot to wide format ---
+        pivot_df = region_event_avg.pivot(
+            index="regionName", columns="eventId", values="metric"
+        ).reset_index()
+
+        # --- Sort by 3x3 speed ---
+        if "333" in pivot_df.columns:
+            pivot_df = pivot_df.sort_values(by="333", ascending=True)
+            pivot_df["333"] = pivot_df["333"].apply(uw.timeconvert)
+
+        logger.info(f"Computed average winning times for {len(pivot_df)} regions.")
+
+        return pivot_df
+
+    except Exception as e:
+        logger.critical(f"Error computing regional winning times: {e}", exc_info=True)
 
 
 def plot_italy_competition_distribution(
@@ -214,6 +320,77 @@ def plot_italy_competition_distribution(
         logger.critical(f"Error creating Italian competition map: {e}", exc_info=True)
 
 
+def plot_competition_locations(
+    db_tables: dict,
+    config: configparser.ConfigParser,
+    logger: logging.Logger
+) -> plt.Figure:
+    """
+    Plot the geographic location of all Italian competitions.
+
+    Reads coordinates from the competitions table, filters only valid ones,
+    and overlays them on the Italian region shapefile.
+    """
+
+    try:
+        if config.country.lower() != "italy":
+            logger.warning("Competition location plotting is only supported for Italy.")
+            return None
+
+        logger.info("Creating competition location map...")
+
+        comps = db_tables["competitions"].copy()
+
+        # --- Filter valid competitions ---
+        df = comps.query("cityName != 'Multiple cities' & countryId == 'Italy'").drop_duplicates(subset=["id"])
+
+        # --- Convert microdegrees to decimal ---
+        df["latitude"] = df["latitude"] / 1000000
+        df["longitude"] = df["longitude"] / 1000000
+
+        # --- Drop missing coordinates ---
+        df = df.dropna(subset=["latitude", "longitude"])
+
+        logger.info(f"{len(df):,} competitions with valid coordinates found.")
+
+        # --- Create points GeoDataFrame ---
+        geometry = [Point(xy) for xy in zip(df["longitude"], df["latitude"])]
+        gdf = gpd.GeoDataFrame(df, geometry=geometry, crs="EPSG:4326")
+
+        # --- Load Italian shapefile ---
+        shp_dir = Path(config["paths"]["shapefile_dir"])
+        shp_file = next(shp_dir.glob("*.shp"), None)
+        if not shp_file:
+            raise FileNotFoundError(f"No .shp file found in {shp_dir}")
+
+        italy = gpd.read_file(shp_file)
+        italy_crs = italy.crs
+
+        # --- Convert points CRS to match map ---
+        gdf = gdf.to_crs(italy_crs)
+
+        # --- Plot ---
+        fig, ax = plt.subplots(figsize=(12, 12))
+        italy.plot(ax=ax, color="#f9f9f9", edgecolor="grey", linewidth=0.8)
+        gdf.plot(ax=ax, color="red", edgecolor="black", markersize=30, zorder=3)
+
+        # --- Styling ---
+        ax.set_title("Location of Italian Competitions", fontsize=14, fontweight="bold")
+        ax.axis("off")
+
+        # --- Layout and return ---
+        fig.tight_layout()
+        plt.close(fig)
+
+        logger.info("Competition location map created successfully.")
+        return fig
+
+    except Exception as e:
+        logger.critical(f"Error creating competition location map: {e}", exc_info=True)
+
+
+
+
 ###################################################################
 ############################### RUN ###############################
 ###################################################################
@@ -232,10 +409,12 @@ def run(db_tables, config):
 
         results = {
             "Most Regions": compute_most_regions(db_tables=db_tables, config=config, logger=logger),
+            "Average Winning Time": compute_average_win_times_by_region(db_tables=db_tables, config=config, logger=logger, n_years=3),
         }
 
         figures = {
             "Competition Distribution": plot_italy_competition_distribution(db_tables=db_tables, config=config, logger=logger),
+            "Competition Location": plot_competition_locations(db_tables=db_tables, config=config, logger=logger),
         }
 
         section_name = __name__.split(".")[-1]
