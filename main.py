@@ -1,6 +1,6 @@
 # main.py
 import utils_wca as uw
-from modules import competitions, events, regions#, results, records, italian_championship, relays, sor_kinch
+from modules import competitions, events, regions, relays#, results, records, italian_championship,  sor_kinch
 
 def main():
     
@@ -44,7 +44,7 @@ def main():
     # results.run(data, config, logger)
     # records.run(data, config, logger)
     # italian_championship.run(data, config, logger)
-    # relays.run(data, config, logger)
+    relays.run(db_tables, config)
 
     logger.info("Pipeline finished successfully")
 

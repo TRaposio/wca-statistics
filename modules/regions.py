@@ -405,7 +405,7 @@ def run(db_tables, config):
             logger.info("Regions module requires config.country = 'Italy'. Other countries are currently not supported.")
 
     else:
-        logger.info("Producing stats for Events module")
+        logger.info("Producing stats for Regions module")
 
         results = {
             "Most Regions": compute_most_regions(db_tables=db_tables, config=config, logger=logger),
