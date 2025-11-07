@@ -25,17 +25,18 @@ def _compute_relay_base(
 
         # --- Load filtered ranks ---
         ranks = db_tables["ranks_single_nationality"].copy()
+        persons = db_tables["persons"][["id", "name"]].drop_duplicates()
 
         # --- Filter only target events ---
         df = ranks.query("eventId in @event_list")
 
         # --- Pivot to get one row per competitor ---
         pivot_best = (
-            df.pivot_table(index="name", columns="eventId", values="best")
+            df.pivot_table(index="personId", columns="eventId", values="best")
             .reindex(columns=event_list)
         )
         pivot_rank = (
-            df.pivot_table(index="name", columns="eventId", values="countryRank")
+            df.pivot_table(index="personId", columns="eventId", values="countryRank")
             .reindex(columns=event_list)
         )
 
@@ -52,8 +53,11 @@ def _compute_relay_base(
         # --- Total score (sum of times) ---
         pivot_best["Total"] = pivot_best.sum(axis=1)
 
-        # --- Merge numeric ranks into results ---
-        df_out = pd.concat([pivot_best, consistency], axis=1)
+        # --- Merge numeric ranks into results and get personName ---
+        df_out = (
+            persons
+            .merge(pd.concat([pivot_best, consistency], axis=1), how='inner', left_on='id', right_on='personId')
+        )
 
         # --- Sort by Total time then Median Rank ---
         df_out = df_out.sort_values(["Total", "Median Rank"], ascending=[True, True])
