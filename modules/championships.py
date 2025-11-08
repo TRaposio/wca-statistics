@@ -387,6 +387,268 @@ def compute_international_podiums(
         logger.critical(f"Error while computing international championship podiums: {e}")
 
 
+def compute_national_final_appearances(
+    db_tables: dict,
+    config,
+    logger
+) -> pd.DataFrame:
+    """
+    Compute the number of national championship final appearances (sum of all events)
+    for competitors of the configured nationality.
+    """
+
+    try:
+        logger.info("Computing national championship final appearances")
+
+        results = db_tables["results_nationality"]
+        persons = db_tables["persons"][["id", "name"]].drop_duplicates()
+
+        # Finals only, valid results, national championships only
+        subset = results.query(
+            "competitionId in @config.nats and roundTypeId in ('c','f')"
+        ).copy()
+
+        if subset.empty:
+            logger.warning("No national championship final results found.")
+            return pd.DataFrame(columns=["WCAID", "Name", "final_appearances"])
+
+        # Count distinct (competitionId, eventId) appearances per person
+        counts = (
+            subset.groupby("personId")["eventId"]
+            .count()
+            .reset_index(name="final_appearances")
+        )
+
+        df = (
+            counts.merge(persons, left_on="personId", right_on="id", how="left")
+            .drop(columns="id")
+            .rename(columns={"personId": "WCAID", "name": "Name"})
+            .sort_values(by="final_appearances", ascending=False)
+            .reset_index(drop=True)
+        )
+
+        df.index += 1
+
+        logger.info(f"Computed {len(df)} competitors with national final appearances")
+
+        return df[["WCAID", "Name", "final_appearances"]]
+
+    except Exception as e:
+        logger.critical(f"Error while computing national championship final appearances: {e}")
+
+
+def compute_national_championships_competed(
+    db_tables: dict,
+    config,
+    logger
+) -> pd.DataFrame:
+    """
+    Compute the number of distinct national championships competed in
+    by competitors of the configured nationality.
+    """
+
+    try:
+        logger.info("Computing number of national championships competed in")
+
+        results = db_tables["results_nationality"]
+
+        subset = results.query("competitionId in @config.nats and best > 0").copy()
+
+        if subset.empty:
+            logger.warning("No national championship participation data found.")
+            return pd.DataFrame(columns=["WCAID", "Name", "championships_competed"])
+
+        # Count distinct national championships
+        counts = (
+            subset.groupby("personId")["competitionId"]
+            .nunique()
+            .reset_index(name="championships_competed")
+        )
+
+        persons = db_tables["persons"][["id", "name"]].drop_duplicates()
+
+        df = (
+            counts.merge(persons, left_on="personId", right_on="id", how="left")
+            .drop(columns="id")
+            .rename(columns={"personId": "WCAID", "name": "Name"})
+            .sort_values(by="championships_competed", ascending=False)
+            .reset_index(drop=True)
+        )
+
+        df.index += 1
+
+        logger.info(f"Computed {len(df)} competitors with national championship participations")
+
+        return df[["WCAID", "Name", "championships_competed"]]
+
+    except Exception as e:
+        logger.critical(f"Error while computing number of national championships competed in: {e}")
+
+
+def compute_major_final_appearances(
+    db_tables: dict,
+    config,
+    logger
+) -> pd.DataFrame:
+    """
+    Compute the number of final appearances (sum of all events)
+    for competitors of the configured nationality at major championships
+    (World and European).
+    """
+
+    try:
+        logger.info("Computing major championship final appearances (World + _Europe)")
+
+        results = db_tables["results_nationality"]
+        championships = db_tables["championships"]
+        persons = db_tables["persons"][["id", "name"]].drop_duplicates()
+
+        intl_champs = championships.query("championship_type in ['world', '_Europe']")["competition_id"].unique()
+
+        subset = results.query(
+            "competitionId in @intl_champs and roundTypeId in ('c','f') and best > 0"
+        ).copy()
+
+        if subset.empty:
+            logger.warning("No major championship final results found.")
+            return pd.DataFrame(columns=["WCAID", "Name", "final_appearances"])
+
+        counts = (
+            subset.groupby("personId")["eventId"]
+            .count()
+            .reset_index(name="final_appearances")
+        ) 
+
+        df = (
+            counts.merge(persons, left_on="personId", right_on="id", how="left")
+            .drop(columns="id")
+            .rename(columns={"personId": "WCAID", "name": "Name"})
+            .sort_values(by="final_appearances", ascending=False)
+            .reset_index(drop=True)
+        )
+
+        df.index += 1
+
+        logger.info(f"Computed {len(df)} competitors with major championship final appearances")
+
+        return df[["WCAID", "Name", "final_appearances"]]
+
+    except Exception as e:
+        logger.critical(f"Error while computing major championship final appearances: {e}")
+
+
+def compute_title_retention_rate(
+    db_tables: dict,
+    config,
+    logger
+) -> pd.DataFrame:
+    """
+    For each event, compute the national title retention rate:
+      retained / (retained + failed),
+    where 'failed' includes cases where the previous year's champion did not repeat
+    (even if they didn’t compete). Missing years (e.g. 2020) are skipped entirely
+    so consecutive existing years are compared (e.g. 2019 -> 2021).
+    """
+    try:
+        logger.info("Computing national title retention rate by event")
+
+        results = db_tables["results_nationality"]
+
+        # National finals with valid results
+        subset = results.query(
+            "competitionId in @config.nats and roundTypeId in ('c','f') and best > 0"
+        ).copy()
+
+        if subset.empty:
+            logger.warning("No national finals found for retention computation.")
+            return pd.DataFrame(columns=["eventId", "retention_rate", "retained", "failed", "total_transitions"])
+
+        # Best-ranked Italian champion per EVENT-YEAR
+        winners = (
+            subset.sort_values(["year", "eventId", "pos"])
+                  .drop_duplicates(subset=["year", "eventId"], keep="first")
+                  .loc[:, ["year", "eventId", "personId"]]
+                  .sort_values(["eventId", "year"])
+                  .reset_index(drop=True)
+        )
+
+        # Vectorized consecutive-year comparison per event
+        winners["prev_person"] = winners.groupby("eventId")["personId"].shift(1)
+        winners["prev_year"]   = winners.groupby("eventId")["year"].shift(1)
+
+        # Any row with a previous champion defines a transition (we SKIP missing years automatically)
+        transitions = winners[winners["prev_person"].notna()].copy()
+        transitions["retained"] = (transitions["personId"] == transitions["prev_person"])
+
+        summary = (
+            transitions.groupby("eventId", as_index=False)
+            .agg(
+                retained=("retained", "sum"),
+                total_transitions=("retained", "count"),
+            )
+        )
+        summary["failed"] = summary["total_transitions"] - summary["retained"]
+        summary["retention_rate"] = (summary["retained"] / summary["total_transitions"]).round(3)
+
+        summary = summary.sort_values(["retention_rate", "total_transitions", "eventId"], ascending=[False, False, True]).reset_index(drop=True)
+        summary.index += 1
+
+        logger.info(f"Computed retention rates for {summary['eventId'].nunique()} events")
+        return summary[["eventId", "retention_rate", "retained", "failed", "total_transitions"]]
+
+    except Exception as e:
+        logger.critical(f"Error while computing title retention rate: {e}")
+
+
+def compute_sweeps(
+    db_tables: dict,
+    config,
+    logger,
+    req_events
+) -> pd.DataFrame:
+    """
+    Chronological list of sweeps where the same Italian is the best-ranked Italian
+    in 555, 666, and 777 finals at the SAME national championship competition.
+    """
+    try:
+        logger.info(f"Computing Sweep for events: {' + '.join(req_events)}")
+
+        results = db_tables["results_nationality"]
+
+        subset = results.query(
+            "competitionId in @config.nats and roundTypeId in ('c','f') and best > 0 and eventId in @req_events"
+        ).copy()
+
+        if subset.empty:
+            logger.warning("No results found for sweep computation.")
+            return pd.DataFrame(columns=["year", "competitionId", "personId", "personName"])
+
+        # Best-ranked Italian per competition & event
+        best_it = (
+            subset.sort_values(["competitionId", "eventId", "pos"])
+                  .drop_duplicates(subset=["competitionId", "eventId"], keep="first")
+        )
+
+        # Count how many required events each person owns per competition
+        agg = (
+            best_it.groupby(["competitionId", "year", "personId", "personName"])["eventId"]
+                   .nunique()
+                   .reset_index(name="events_won")
+        )
+
+        n_events = len(req_events)
+
+        sweeps = agg.query("events_won == @n_events").copy()
+        sweeps = sweeps.sort_values(["year", "competitionId"]).reset_index(drop=True)
+        sweeps.index += 1
+
+        logger.info(f"Found {len(sweeps)} sweeps")
+        return sweeps[["year", "competitionId", "personId", "personName"]]
+
+    except Exception as e:
+        logger.critical(f"Error while computing Big Cubes sweeps: {e}")
+
+
 
 def plot_competition_locations(
     db_tables: dict,
@@ -481,7 +743,13 @@ def run(db_tables, config):
         "Medagliere": compute_national_championship_medal_table(db_tables=db_tables, config=config, logger=logger),
         "Medagliere FMC": compute_national_championship_medal_table(db_tables=db_tables, config=config, logger=logger, event='333fm'),
         "Streaks": compute_championship_streaks(db_tables=db_tables, config=config, logger=logger, event=None),
-        "Major Championshp Podiums": compute_international_podiums(db_tables=db_tables, config=config, logger=logger)
+        "Major Championshp Podiums": compute_international_podiums(db_tables=db_tables, config=config, logger=logger),
+        "Nats Appearances": compute_national_championships_competed(db_tables=db_tables, config=config, logger=logger),
+        "Nats Final Appearances": compute_national_final_appearances(db_tables=db_tables, config=config, logger=logger),
+        "Major Final Appearances": compute_major_final_appearances(db_tables=db_tables, config=config, logger=logger),
+        "Title Retention": compute_title_retention_rate(db_tables=db_tables, config=config, logger=logger),
+        "Big Cube Sweeps": compute_sweeps(db_tables=db_tables, config=config, logger=logger, req_events=["555", "666", "777"]),
+        "Blind Sweeps": compute_sweeps(db_tables=db_tables, config=config, logger=logger, req_events=["333bf", "444bf", "555bf", "333mbf"])
     }
 
     figures = {
