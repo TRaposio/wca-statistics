@@ -691,162 +691,239 @@ def timeconvert(x: float) -> str:
         return f"{int(x / 6000)}:{a / 100:.2f}"
 
 
-def multisolved(x: int | float, logger: logging.Logger | None = None) -> float:
-    """
-    Compute number of cubes solved in Multi-Blind (MBLD) event
-    from encoded integer value.
-
-    Parameters
-    ----------
-    x : int | float
-        Encoded MBLD result value.
-    logger : logging.Logger, optional
-        Logger for debug output.
-
-    Returns
-    -------
-    float
-        Number of cubes solved.
-    """
+def multisolved(x, logger=None):
     try:
-        if np.isnan(x):
+        if pd.isna(x):
             return np.nan
-        DD = 99 - x // 10_000_000
+        x = int(x)
+        DD = (x // 10_000_000) % 100
         MM = x % 100
-        return float(DD + MM)
+        difference = 99 - DD
+        solved = difference + MM
+        return float(solved)
     except Exception as e:
         if logger:
-            logger.warning(f"multisolved() failed for x={x}: {e}")
+            logger.warning(f"multisolved() failed for {x}: {e}")
         return np.nan
 
 
-def multiwrong(x: int | float, logger: logging.Logger | None = None) -> float:
-    """
-    Extract number of cubes missed in Multi-Blind (MBLD) event.
-
-    Parameters
-    ----------
-    x : int | float
-        Encoded MBLD result value.
-    logger : logging.Logger, optional
-        Logger for debug output.
-
-    Returns
-    -------
-    float
-        Number of cubes missed.
-    """
+def multiwrong(x, logger=None):
     try:
-        if np.isnan(x):
+        if pd.isna(x):
             return np.nan
+        x = int(x)
         return float(x % 100)
     except Exception as e:
         if logger:
-            logger.warning(f"multiwrong() failed for x={x}: {e}")
+            logger.warning(f"multiwrong() failed for {x}: {e}")
         return np.nan
 
 
-def multiattempted(x: int | float, logger: logging.Logger | None = None) -> float:
-    """
-    Compute total number of cubes attempted in MBLD event.
-
-    Parameters
-    ----------
-    x : int | float
-        Encoded MBLD result value.
-    logger : logging.Logger, optional
-        Logger for debug output.
-
-    Returns
-    -------
-    float
-        Number of cubes attempted.
-    """
+def multiattempted(x, logger=None):
     try:
-        if np.isnan(x):
+        if pd.isna(x):
             return np.nan
-        DD = 99 - x // 10_000_000
+        x = int(x)
+        DD = (x // 10_000_000) % 100
         MM = x % 100
-        return float(DD + 2 * MM)
+        difference = 99 - DD
+        attempted = difference + 2 * MM
+        return float(attempted)
     except Exception as e:
         if logger:
-            logger.warning(f"multiattempted() failed for x={x}: {e}")
+            logger.warning(f"multiattempted() failed for {x}: {e}")
         return np.nan
 
 
-def multitime(x: int | float, logger: logging.Logger | None = None) -> float:
-    """
-    Compute time in seconds for MBLD attempt from encoded value.
-
-    Parameters
-    ----------
-    x : int | float
-        Encoded MBLD result value.
-    logger : logging.Logger, optional
-        Logger for debug output.
-
-    Returns
-    -------
-    float
-        Time in seconds (approximate, handles special cases).
-    """
+def multitime(x, logger=None):
     try:
-        if np.isnan(x):
+        if pd.isna(x):
             return np.nan
-
-        dd = 99 - x // 10_000_000  # difference (solved = dd + mm)
-        mm = x % 100               # missed
-        tt = (x // 100) % 100_000  # time
-        aa = dd + 2 * mm           # attempted
-
-        # Handle invalid 99_999 placeholder (DNF-like cases)
-        if tt == 99_999:
-            tt = min(600 * aa, 3_600)
-        if aa < 6:
-            return float(600 * aa)
-
-        return float(tt)
+        x = int(x)
+        TT = (x // 100) % 100_000
+        # 99999 means "unknown"
+        return np.nan if TT == 99_999 else float(TT)
     except Exception as e:
         if logger:
-            logger.warning(f"multitime() failed for x={x}: {e}")
+            logger.warning(f"multitime() failed for {x}: {e}")
         return np.nan
 
 
-def oldmultitime(x: int | float, logger: logging.Logger | None = None) -> float:
-    """
-    Legacy Multi-Blind decoding for older results encoding format.
-
-    Parameters
-    ----------
-    x : int | float
-        Encoded MBLD result value (old format).
-    logger : logging.Logger, optional
-        Logger for debug output.
-
-    Returns
-    -------
-    float
-        Time in centiseconds (approximate, handles special cases).
-    """
+def multiresult(x, logger=None):
+    """Return string like '47/50 37:15' or '47/50 (unknown)'."""
     try:
-        if np.isnan(x):
-            return np.nan
-
-        tt = x % 100_000
-        ss = 199 - x // 10_000_000
-        aa = (x // 100_000) % 100
-
-        if tt == 99_999:
-            tt = min(600 * aa, 3_600)
-
-        return float(tt * 100)
+        s = int(multisolved(x, logger))
+        a = int(multiattempted(x, logger))
+        t = multitime(x, logger)
+        if pd.isna(t):
+            t_str = "(unknown)"
+        else:
+            # Use your time conversion util if available
+            t_str = timeconvert(t)
+        return f"{s}/{a} {t_str}"
     except Exception as e:
         if logger:
-            logger.warning(f"oldmultitime() failed for x={x}: {e}")
-        return np.nan
+            logger.warning(f"multiresult() failed for {x}: {e}")
+        return ""
 
 
-def multiresult(x: int | float, logger: logging.Logger | None = None) -> str:
-    """Converts an encoded multi result in a 'made/attempted time' string."""
 
-    return str(multisolved(x))+'/'+str(multiattempted(x))+' '+timeconvert(multitime(x))
+# def multisolved(x: int | float, logger: logging.Logger | None = None) -> float:
+#     """
+#     Compute number of cubes solved in Multi-Blind (MBLD) event
+#     from encoded integer value.
+
+#     Parameters
+#     ----------
+#     x : int | float
+#         Encoded MBLD result value.
+#     logger : logging.Logger, optional
+#         Logger for debug output.
+
+#     Returns
+#     -------
+#     float
+#         Number of cubes solved.
+#     """
+#     try:
+#         if np.isnan(x):
+#             return np.nan
+#         DD = 99 - x // 10_000_000
+#         MM = x % 100
+#         return float(DD + MM)
+#     except Exception as e:
+#         if logger:
+#             logger.warning(f"multisolved() failed for x={x}: {e}")
+#         return np.nan
+
+
+# def multiwrong(x: int | float, logger: logging.Logger | None = None) -> float:
+#     """
+#     Extract number of cubes missed in Multi-Blind (MBLD) event.
+
+#     Parameters
+#     ----------
+#     x : int | float
+#         Encoded MBLD result value.
+#     logger : logging.Logger, optional
+#         Logger for debug output.
+
+#     Returns
+#     -------
+#     float
+#         Number of cubes missed.
+#     """
+#     try:
+#         if np.isnan(x):
+#             return np.nan
+#         return float(x % 100)
+#     except Exception as e:
+#         if logger:
+#             logger.warning(f"multiwrong() failed for x={x}: {e}")
+#         return np.nan
+
+
+# def multiattempted(x: int | float, logger: logging.Logger | None = None) -> float:
+#     """
+#     Compute total number of cubes attempted in MBLD event.
+
+#     Parameters
+#     ----------
+#     x : int | float
+#         Encoded MBLD result value.
+#     logger : logging.Logger, optional
+#         Logger for debug output.
+
+#     Returns
+#     -------
+#     float
+#         Number of cubes attempted.
+#     """
+#     try:
+#         if np.isnan(x):
+#             return np.nan
+#         DD = 99 - x // 10_000_000
+#         MM = x % 100
+#         return float(DD + 2 * MM)
+#     except Exception as e:
+#         if logger:
+#             logger.warning(f"multiattempted() failed for x={x}: {e}")
+#         return np.nan
+
+
+# def multitime(x: int | float, logger: logging.Logger | None = None) -> float:
+#     """
+#     Compute time in seconds for MBLD attempt from encoded value.
+
+#     Parameters
+#     ----------
+#     x : int | float
+#         Encoded MBLD result value.
+#     logger : logging.Logger, optional
+#         Logger for debug output.
+
+#     Returns
+#     -------
+#     float
+#         Time in seconds (approximate, handles special cases).
+#     """
+#     try:
+#         if np.isnan(x):
+#             return np.nan
+
+#         dd = 99 - x // 10_000_000  # difference (solved = dd + mm)
+#         mm = x % 100               # missed
+#         tt = (x // 100) % 100_000  # time
+#         aa = dd + 2 * mm           # attempted
+
+#         # Handle invalid 99_999 placeholder (DNF-like cases)
+#         if tt == 99_999:
+#             tt = min(600 * aa, 3_600)
+#         if aa < 6:
+#             return float(600 * aa)
+
+#         return float(tt)
+#     except Exception as e:
+#         if logger:
+#             logger.warning(f"multitime() failed for x={x}: {e}")
+#         return np.nan
+
+
+# def oldmultitime(x: int | float, logger: logging.Logger | None = None) -> float:
+#     """
+#     Legacy Multi-Blind decoding for older results encoding format.
+
+#     Parameters
+#     ----------
+#     x : int | float
+#         Encoded MBLD result value (old format).
+#     logger : logging.Logger, optional
+#         Logger for debug output.
+
+#     Returns
+#     -------
+#     float
+#         Time in centiseconds (approximate, handles special cases).
+#     """
+#     try:
+#         if np.isnan(x):
+#             return np.nan
+
+#         tt = x % 100_000
+#         ss = 199 - x // 10_000_000
+#         aa = (x // 100_000) % 100
+
+#         if tt == 99_999:
+#             tt = min(600 * aa, 3_600)
+
+#         return float(tt * 100)
+#     except Exception as e:
+#         if logger:
+#             logger.warning(f"oldmultitime() failed for x={x}: {e}")
+#         return np.nan
+
+
+# def multiresult(x: int | float, logger: logging.Logger | None = None) -> str:
+#     """Converts an encoded multi result in a 'made/attempted time' string."""
+
+#     return str(int(multisolved(x)))+'/'+str(int(multiattempted(x)))+' '+timeconvert(multitime(x))
