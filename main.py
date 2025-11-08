@@ -1,6 +1,6 @@
 # main.py
 import utils_wca as uw
-from modules import competitions, events, regions, relays#, results, records, italian_championship,  sor_kinch
+from modules import competitions, events, regions, relays, championships#, results, records,  sor_kinch
 
 def main():
     
@@ -37,14 +37,16 @@ def main():
         logger.critical(f"Found {len(missing)} unmapped competitions. These won't be counted in the stats unless mapped.")
 
     # --- Run modules, passing the preloaded tables ---
-    competitions.run(db_tables, config)
-    events.run(db_tables, config)
-    regions.run(db_tables, config)
+    # competitions.run(db_tables, config)
+    # events.run(db_tables, config)
+    # regions.run(db_tables, config)
+    championships.run(db_tables, config)
+    # relays.run(db_tables, config)
+
+    # ----
     # sor_kinch.run(data, config, logger)
     # results.run(data, config, logger)
     # records.run(data, config, logger)
-    # italian_championship.run(data, config, logger)
-    relays.run(db_tables, config)
 
     logger.info("Pipeline finished successfully")
 

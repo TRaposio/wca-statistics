@@ -323,7 +323,8 @@ def plot_italy_competition_distribution(
 def plot_competition_locations(
     db_tables: dict,
     config: configparser.ConfigParser,
-    logger: logging.Logger
+    logger: logging.Logger,
+    championship: bool
 ) -> plt.Figure:
     """
     Plot the geographic location of all Italian competitions.
@@ -342,7 +343,10 @@ def plot_competition_locations(
         comps = db_tables["competitions"].copy()
 
         # --- Filter valid competitions ---
-        df = comps.query("cityName != 'Multiple cities' & countryId == 'Italy'").drop_duplicates(subset=["id"])
+        if championship:
+            df = comps.query("cityName != 'Multiple cities' & countryId == 'Italy' & id in @config.nats").drop_duplicates(subset=["id"])
+        else:
+            df = comps.query("cityName != 'Multiple cities' & countryId == 'Italy'").drop_duplicates(subset=["id"])
 
         # --- Convert microdegrees to decimal ---
         df["latitude"] = df["latitude"] / 1000000
@@ -414,7 +418,7 @@ def run(db_tables, config):
 
         figures = {
             "Competition Distribution": plot_italy_competition_distribution(db_tables=db_tables, config=config, logger=logger),
-            "Competition Location": plot_competition_locations(db_tables=db_tables, config=config, logger=logger),
+            "Competition Location": plot_competition_locations(db_tables=db_tables, config=config, logger=logger, championship=False),
         }
 
         section_name = __name__.split(".")[-1]
