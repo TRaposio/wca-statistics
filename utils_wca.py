@@ -2,7 +2,6 @@ from pathlib import Path
 import configparser
 import urllib.request
 import zipfile
-import datetime
 import pandas as pd
 import logging
 import sys
@@ -360,6 +359,7 @@ def make_localized_results_df(db_tables: dict, config: configparser.ConfigParser
     try:  
         # Rename column in competitions
         db_tables["competitions"] = db_tables["competitions"].rename(columns = {'name':'competitionName'})
+        db_tables["competitions"]['date'] = pd.to_datetime(db_tables["competitions"][['year','month','day']])
 
         logger.info("Renamed column name to competitionName in competitions dataframe")
 
@@ -385,8 +385,6 @@ def make_localized_results_df(db_tables: dict, config: configparser.ConfigParser
             .drop('id', axis=1)
         )
 
-        df['date'] = pd.to_datetime(df[['year','month','day']])
-
         db_tables["results_nationality"] = df
 
         # Filter for host country
@@ -410,8 +408,6 @@ def make_localized_results_df(db_tables: dict, config: configparser.ConfigParser
             )
             .drop('id', axis=1)
         )
-
-        df['date'] = pd.to_datetime(df[['year','month','day']])
 
         db_tables["results_country"] = df
 
@@ -530,6 +526,46 @@ def make_localized_rankings(db_tables: dict, config: configparser.ConfigParser, 
         logger.critical(f"Error during ranks_average/persons merge: {e}", exc_info=True)
 
 
+def make_better_multi_results(db_tables: dict, config: configparser.ConfigParser, logger: logging.Logger):
+
+    """
+    Decode the wca multi encoding for easier computation of statistics
+    """
+
+    results = db_tables["results"].query("eventId == '333mbf'").copy()
+
+    try:
+        results = (
+            results
+            .melt(
+                id_vars=[col for col in results.columns if not col.startswith('value')],
+                value_vars=['value1', 'value2', 'value3', 'value4', 'value5'],
+                var_name='solve_index',
+                value_name='solve'
+            )
+            .query("solve != 0")
+            .copy()
+            .drop(columns = ["best", "average"])
+        )
+
+        results['solve_index'] = results['solve_index'].str.extract('(\d+)').astype(int)
+
+        results["attempted"] = results["solve"].apply(multiattempted)
+        results["solved"] = results["solve"].apply(multisolved)
+        results["wrong"] = results["attempted"] - results["solved"]
+        results["points"] = results["solved"] - results["wrong"]
+        results["time"] = results["solve"].apply(multitime)
+        results["display"] = results["solve"].apply(multiresult)
+
+        db_tables["multi_results"] = results
+
+        logger.info("Added multi_results table to db_tables")
+
+
+    except Exception as e:
+        logger.critical(f"Error during better multi results creation: {e}", exc_info=True)
+
+
 def process_tables(db_tables: dict[str, pd.DataFrame], config: configparser.ConfigParser, logger: logging.Logger) -> dict[str, pd.DataFrame]:
     
     """
@@ -541,6 +577,7 @@ def process_tables(db_tables: dict[str, pd.DataFrame], config: configparser.Conf
     make_localized_results_df(db_tables, config, logger)
     fix_results_nationality(db_tables, config, logger)
     make_localized_rankings(db_tables, config, logger)
+    make_better_multi_results(db_tables, config, logger)
 
     # --- Extract list of championships ---
     try:
@@ -692,6 +729,10 @@ def timeconvert(x: float) -> str:
 
 
 def multisolved(x, logger=None):
+
+    if x <= 0:
+        return np.nan
+
     try:
         if pd.isna(x):
             return np.nan
@@ -708,6 +749,10 @@ def multisolved(x, logger=None):
 
 
 def multiwrong(x, logger=None):
+
+    if x <= 0:
+        return np.nan
+
     try:
         if pd.isna(x):
             return np.nan
@@ -720,6 +765,10 @@ def multiwrong(x, logger=None):
 
 
 def multiattempted(x, logger=None):
+
+    if x <= 0:
+        return np.nan
+    
     try:
         if pd.isna(x):
             return np.nan
@@ -736,13 +785,17 @@ def multiattempted(x, logger=None):
 
 
 def multitime(x, logger=None):
+
+    if x <= 0:
+        return np.nan
+
     try:
         if pd.isna(x):
             return np.nan
         x = int(x)
         TT = (x // 100) % 100_000
         # 99999 means "unknown"
-        return np.nan if TT == 99_999 else float(TT)
+        return np.nan if TT == 99_999 else float(TT*100) #restituisce tempo in centisecondi per uniformità
     except Exception as e:
         if logger:
             logger.warning(f"multitime() failed for {x}: {e}")
@@ -755,175 +808,12 @@ def multiresult(x, logger=None):
         s = int(multisolved(x, logger))
         a = int(multiattempted(x, logger))
         t = multitime(x, logger)
-        if pd.isna(t):
-            t_str = "(unknown)"
+        if pd.isna(t) | pd.isna(s) | pd.isna(a):
+            t_str = ''
         else:
-            # Use your time conversion util if available
             t_str = timeconvert(t)
         return f"{s}/{a} {t_str}"
     except Exception as e:
         if logger:
             logger.warning(f"multiresult() failed for {x}: {e}")
         return ""
-
-
-
-# def multisolved(x: int | float, logger: logging.Logger | None = None) -> float:
-#     """
-#     Compute number of cubes solved in Multi-Blind (MBLD) event
-#     from encoded integer value.
-
-#     Parameters
-#     ----------
-#     x : int | float
-#         Encoded MBLD result value.
-#     logger : logging.Logger, optional
-#         Logger for debug output.
-
-#     Returns
-#     -------
-#     float
-#         Number of cubes solved.
-#     """
-#     try:
-#         if np.isnan(x):
-#             return np.nan
-#         DD = 99 - x // 10_000_000
-#         MM = x % 100
-#         return float(DD + MM)
-#     except Exception as e:
-#         if logger:
-#             logger.warning(f"multisolved() failed for x={x}: {e}")
-#         return np.nan
-
-
-# def multiwrong(x: int | float, logger: logging.Logger | None = None) -> float:
-#     """
-#     Extract number of cubes missed in Multi-Blind (MBLD) event.
-
-#     Parameters
-#     ----------
-#     x : int | float
-#         Encoded MBLD result value.
-#     logger : logging.Logger, optional
-#         Logger for debug output.
-
-#     Returns
-#     -------
-#     float
-#         Number of cubes missed.
-#     """
-#     try:
-#         if np.isnan(x):
-#             return np.nan
-#         return float(x % 100)
-#     except Exception as e:
-#         if logger:
-#             logger.warning(f"multiwrong() failed for x={x}: {e}")
-#         return np.nan
-
-
-# def multiattempted(x: int | float, logger: logging.Logger | None = None) -> float:
-#     """
-#     Compute total number of cubes attempted in MBLD event.
-
-#     Parameters
-#     ----------
-#     x : int | float
-#         Encoded MBLD result value.
-#     logger : logging.Logger, optional
-#         Logger for debug output.
-
-#     Returns
-#     -------
-#     float
-#         Number of cubes attempted.
-#     """
-#     try:
-#         if np.isnan(x):
-#             return np.nan
-#         DD = 99 - x // 10_000_000
-#         MM = x % 100
-#         return float(DD + 2 * MM)
-#     except Exception as e:
-#         if logger:
-#             logger.warning(f"multiattempted() failed for x={x}: {e}")
-#         return np.nan
-
-
-# def multitime(x: int | float, logger: logging.Logger | None = None) -> float:
-#     """
-#     Compute time in seconds for MBLD attempt from encoded value.
-
-#     Parameters
-#     ----------
-#     x : int | float
-#         Encoded MBLD result value.
-#     logger : logging.Logger, optional
-#         Logger for debug output.
-
-#     Returns
-#     -------
-#     float
-#         Time in seconds (approximate, handles special cases).
-#     """
-#     try:
-#         if np.isnan(x):
-#             return np.nan
-
-#         dd = 99 - x // 10_000_000  # difference (solved = dd + mm)
-#         mm = x % 100               # missed
-#         tt = (x // 100) % 100_000  # time
-#         aa = dd + 2 * mm           # attempted
-
-#         # Handle invalid 99_999 placeholder (DNF-like cases)
-#         if tt == 99_999:
-#             tt = min(600 * aa, 3_600)
-#         if aa < 6:
-#             return float(600 * aa)
-
-#         return float(tt)
-#     except Exception as e:
-#         if logger:
-#             logger.warning(f"multitime() failed for x={x}: {e}")
-#         return np.nan
-
-
-# def oldmultitime(x: int | float, logger: logging.Logger | None = None) -> float:
-#     """
-#     Legacy Multi-Blind decoding for older results encoding format.
-
-#     Parameters
-#     ----------
-#     x : int | float
-#         Encoded MBLD result value (old format).
-#     logger : logging.Logger, optional
-#         Logger for debug output.
-
-#     Returns
-#     -------
-#     float
-#         Time in centiseconds (approximate, handles special cases).
-#     """
-#     try:
-#         if np.isnan(x):
-#             return np.nan
-
-#         tt = x % 100_000
-#         ss = 199 - x // 10_000_000
-#         aa = (x // 100_000) % 100
-
-#         if tt == 99_999:
-#             tt = min(600 * aa, 3_600)
-
-#         return float(tt * 100)
-#     except Exception as e:
-#         if logger:
-#             logger.warning(f"oldmultitime() failed for x={x}: {e}")
-#         return np.nan
-
-
-# def multiresult(x: int | float, logger: logging.Logger | None = None) -> str:
-#     """Converts an encoded multi result in a 'made/attempted time' string."""
-
-#     return str(int(multisolved(x)))+'/'+str(int(multiattempted(x)))+' '+timeconvert(multitime(x))

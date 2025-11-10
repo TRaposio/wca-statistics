@@ -1,7 +1,6 @@
 import pandas as pd
 import numpy as np
 import utils_wca as uw
-import matplotlib.pyplot as plt
 import configparser
 import logging
 
