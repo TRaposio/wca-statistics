@@ -465,7 +465,7 @@ def plot_event_record_history(
         # Labels and title
         ax.set_title(f"{config.nationality} National and World Record Progression — {event_id}", fontsize=15)
         ax.set_xlabel("Date")
-        ax.set_ylabel("Time (seconds)")
+        ax.set_ylabel(f"{ 'Points' if event_id == '333mbf' else 'Moves' if event_id == '333fm' else 'Time (seconds)'}")
         ax.legend(fontsize=12)
 
         plt.tight_layout()

@@ -39,6 +39,9 @@ Thumbs.db
 # Ignore backup files
 readme_backup.txt
 
-# Temporary ignore
+# Aux Files
 data/regions/missing_region_mappings_ita.csv
+
+# Temporary ignore
 misc/
+todo.txt
