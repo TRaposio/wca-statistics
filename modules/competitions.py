@@ -24,17 +24,17 @@ def compute_most_competitions(
         # Count unique competitions per competitor
         df_counts = (
             results
-            .groupby("personId")["competitionId"]
+            .groupby("person_id")["competition_id"]
             .nunique()
             .reset_index()
-            .rename(columns={"personId": "WCAID", "competitionId": "Number of Competitions"})
+            .rename(columns={"person_id": "WCAID", "competition_id": "Number of Competitions"})
         )
 
         # Merge with persons table to get competitor names
         df_final = (
             df_counts
-            .merge(persons[["id", "name"]], how="left", left_on="WCAID", right_on="id")
-            .drop(columns="id")
+            .merge(persons[["wca_id", "name"]], how="left", left_on="WCAID", right_on="wca_id")
+            .drop(columns="wca_id")
             .rename(columns={"name": "Name"})
             .sort_values(by="Number of Competitions", ascending=False)
             .reset_index(drop=True)
@@ -69,18 +69,18 @@ def compute_most_countries(
         # Count unique countries per competitor
         df_counts = (
             results
-            .query("countryId not in @config.multivenue")
-            .groupby("personId")["countryId"]
+            .query("country_id not in @config.multivenue")
+            .groupby("person_id")["country_id"]
             .nunique()
             .reset_index()
-            .rename(columns={"personId": "WCAID", "countryId": "Number of Countries"})
+            .rename(columns={"person_id": "WCAID", "country_id": "Number of Countries"})
         )
 
         # Merge with persons table to get competitor names
         df_final = (
             df_counts
-            .merge(persons[["id", "name"]], how="left", left_on="WCAID", right_on="id")
-            .drop(columns="id")
+            .merge(persons[["wca_id", "name"]], how="left", left_on="WCAID", right_on="wca_id")
+            .drop(columns="wca_id")
             .rename(columns={"name": "Name"})
             .sort_values(by="Number of Countries", ascending=False)
             .reset_index(drop=True)
@@ -114,10 +114,10 @@ def compute_most_competitors(
         # Count unique competitors per competition
         df = (
             results
-            .groupby("competitionId")["personId"]
+            .groupby("competition_id")["person_id"]
             .nunique()
             .reset_index()
-            .rename(columns={"competitionId": "Competition ID", "personId": "Number of Competitors"})
+            .rename(columns={"competition_id": "Competition ID", "person_id": "Number of Competitors"})
             .sort_values(by="Number of Competitors", ascending=False)
             .reset_index(drop=True)
         )
@@ -151,10 +151,10 @@ def compute_return_rate(
         # competitions per competitor -> group by country and agg number of competitors and number of returners -> compute return rate -> filter for threshold
         retrate = (
             df
-            .groupby(["personCountryId", "personId"])["competitionId"]
+            .groupby(["person_country_id", "person_id"])["competition_id"]
             .nunique()
             .reset_index(name="num_comps")
-            .groupby("personCountryId")
+            .groupby("person_country_id")
             .agg(
                 Competitors=("num_comps", "size"),
                 Returners=("num_comps", lambda x: (x >= 2).sum())
@@ -164,7 +164,7 @@ def compute_return_rate(
                 return_rate=lambda x: (100 * x["Returners"] / x["Competitors"]).round(2)
             )
             .query("Competitors >= @min_competitors")
-            .rename(columns={"personCountryId": "Country", "return_rate": "Return Rate"})
+            .rename(columns={"person_country_id": "Country", "return_rate": "Return Rate"})
             .sort_values("Return Rate", ascending=False)
             .reset_index(drop=True)
         )
@@ -201,19 +201,19 @@ def compute_community_recency(
         # competitions per competitor -> group by country and agg number of competitors and number of returners -> compute return rate -> filter for threshold
 
         threshold_year = pd.to_datetime(threshold).year
-        df["competitionYear"] = (
-            df["competitionId"]
+        df["competition_year"] = (
+            df["competition_id"]
             .str.extract(r"(\d{4})$")[0]
             .astype(float)
         )
-        df["post_covid"] = df["competitionYear"] >= threshold_year
+        df["post_covid"] = df["competition_year"] >= threshold_year
 
         post_covid = (
             df
-            .groupby(["personCountryId", "personId"])["post_covid"]
+            .groupby(["person_country_id", "person_id"])["post_covid"]
             .any()
             .reset_index()
-            .groupby("personCountryId")
+            .groupby("person_country_id")
             .agg(
                 Competitors=("post_covid", "size"),
                 post_covid_competitors=("post_covid", "sum")
@@ -223,7 +223,7 @@ def compute_community_recency(
                 rate=lambda x: (100 * x["post_covid_competitors"] / x["Competitors"]).round(2)
             )
             .query("Competitors >= @min_competitors")
-            .rename(columns={"personCountryId": "Country", "post_covid_competitors": "Competed After Covid", "rate": "Competed After Covid (%)"})
+            .rename(columns={"person_country_id": "Country", "post_covid_competitors": "Competed After Covid", "rate": "Competed After Covid (%)"})
             .sort_values("Competed After Covid (%)", ascending=False)
             .reset_index(drop=True)
         )
@@ -254,7 +254,7 @@ def compute_newcomer_statistics(
         nationality = config.nationality
         df_n = db_tables["results_nationality"].copy() #df_nationality
         df_c = db_tables["results_country"].copy() #df_country
-        persons = db_tables["persons"][["id", "gender"]]
+        persons = db_tables["persons"][["wca_id", "gender"]]
 
         logger.info(f"Computing yearly newcomer statistics for nationality={nationality} (with gender breakdown)")
 
@@ -262,33 +262,33 @@ def compute_newcomer_statistics(
         df_n = (
             df_n.
             merge(
-                persons[["id", "gender"]], 
+                persons[["wca_id", "gender"]], 
                 how="left", 
-                left_on="personId", 
-                right_on="id"
+                left_on="person_id", 
+                right_on="wca_id"
             )
-            .drop(columns="id")
+            .drop(columns="wca_id")
         )
 
         df_c = (
             df_c.
             merge(
-                persons[["id", "gender"]], 
+                persons[["wca_id", "gender"]], 
                 how="left", 
-                left_on="personId", 
-                right_on="id"
+                left_on="person_id", 
+                right_on="wca_id"
             )
-            .drop(columns="id")
+            .drop(columns="wca_id")
         )
 
         # --- Extract newcomer's registration year (first 4 chars of personId) ---
-        df_n["newcomer_year"] = df_n["personId"].str[:4].astype(int)
+        df_n["newcomer_year"] = df_n["person_id"].str[:4].astype(int)
 
 
         # --- Newcomers per year ---
         newcomers_by_gender = (
             df_n.loc[df_n["newcomer_year"] == df_n["year"]]
-            .groupby(["year", "gender"], observed=True)["personId"]
+            .groupby(["year", "gender"], observed=True)["person_id"]
             .nunique()
             .unstack(fill_value=0)
             .rename_axis(None, axis=1)
@@ -299,7 +299,7 @@ def compute_newcomer_statistics(
         # --- Competitions and competitors per year --
         competitors_by_gender = (
             df_n
-            .groupby(["year", "gender"], observed=True)["personId"]
+            .groupby(["year", "gender"], observed=True)["person_id"]
             .nunique()
             .unstack(fill_value=0)
             .rename_axis(None, axis=1)
@@ -309,10 +309,10 @@ def compute_newcomer_statistics(
 
         # --- Italian Competitions ---
         country_competitions = (
-            df_c.groupby("year", observed=True)["competitionId"]
+            df_c.groupby("year", observed=True)["competition_id"]
             .nunique()
             .reset_index()
-            .rename(columns = {"competitionId": "Number of Competitions"})
+            .rename(columns = {"competition_id": "Number of Competitions"})
         )
 
         # --- Merge all ---

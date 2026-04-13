@@ -20,22 +20,22 @@ def compute_most_events_won(
 
         # --- Load data ---
         results = db_tables["results_fixed"].copy()
-        persons = db_tables["persons"][["id", "name"]].drop_duplicates()
+        persons = db_tables["persons"][["wca_id", "name"]].drop_duplicates()
 
         # Replace invalid results and drop NaN
         golds = (
             results
-            .query("roundTypeId in ['f', 'c'] & pos == 1")      # winners in finals
+            .query("round_type_id in ['f', 'c'] & pos == 1")      # winners in finals
             .replace([0, -1, -2], np.nan)
             .dropna(subset=["best"])        # must win with a result
-            .groupby("personId")["eventId"]
+            .groupby("person_id")["event_id"]
             .nunique()
             .rename("Different Events Won")
             .reset_index()
         )
 
         total_events = (
-            results.groupby("personId", observed=True)["eventId"]
+            results.groupby("person_id", observed=True)["event_id"]
             .nunique()
             .rename("Events Competed In")
             .reset_index()
@@ -44,10 +44,10 @@ def compute_most_events_won(
         # --- Merge and sort ---
         df = (
             persons
-            .merge(golds, how="inner", left_on="id", right_on="personId")
-            .merge(total_events, how="left", left_on="id", right_on="personId")
-            .drop(columns=["personId_x", "personId_y"], errors="ignore")
-            .rename(columns={"id": "WCAID", "name": "Name"})
+            .merge(golds, how="inner", left_on="wca_id", right_on="person_id")
+            .merge(total_events, how="left", left_on="wca_id", right_on="person_id")
+            .drop(columns=["person_id_x", "person_id_y"], errors="ignore")
+            .rename(columns={"wca_id": "WCAID", "name": "Name"})
             .sort_values(by=["Different Events Won", "Events Competed In"], ascending=[False, True])
             .reset_index(drop=True)
         )
@@ -76,22 +76,22 @@ def compute_most_events_podiumed(
 
         # --- Load data ---
         results = db_tables["results_fixed"].copy()
-        persons = db_tables["persons"][["id", "name"]].drop_duplicates()
+        persons = db_tables["persons"][["wca_id", "name"]].drop_duplicates()
 
         # Replace invalid results and drop NaN
         podiums = (
             results
-            .query("roundTypeId in ['f', 'c'] & pos <= 3")      # podium finishers in finals
+            .query("round_type_id in ['f', 'c'] & pos <= 3")      # podium finishers in finals
             .replace([0, -1, -2], np.nan)
             .dropna(subset=["best"])        # must win with a result
-            .groupby("personId")["eventId"]
+            .groupby("person_id")["event_id"]
             .nunique()
             .rename("Different Events Podiumed")
             .reset_index()
         )
 
         total_events = (
-            results.groupby("personId", observed=True)["eventId"]
+            results.groupby("person_id", observed=True)["event_id"]
             .nunique()
             .rename("Events Competed In")
             .reset_index()
@@ -100,10 +100,10 @@ def compute_most_events_podiumed(
         # --- Merge and sort ---
         df = (
             persons
-            .merge(podiums, how="inner", left_on="id", right_on="personId")
-            .merge(total_events, how="left", left_on="id", right_on="personId")
-            .drop(columns=["personId_x", "personId_y"], errors="ignore")
-            .rename(columns={"id": "WCAID", "name": "Name"})
+            .merge(podiums, how="inner", left_on="wca_id", right_on="person_id")
+            .merge(total_events, how="left", left_on="wca_id", right_on="person_id")
+            .drop(columns=["person_id_x", "person_id_y"], errors="ignore")
+            .rename(columns={"wca_id": "WCAID", "name": "Name"})
             .sort_values(by=["Different Events Podiumed", "Events Competed In"], ascending=[False, True])
             .reset_index(drop=True)
         )
@@ -136,7 +136,7 @@ def compute_event_participation_percentage(
         persons = db_tables["persons"]
 
         # --- Total number of competitors for this nationality ---
-        total_competitors = persons.query("countryId == @config.nationality")["id"].nunique()
+        total_competitors = persons.query("country_id == @config.nationality")["wca_id"].nunique()
 
         if total_competitors == 0:
             logger.warning(f"No competitors found for nationality '{config.nationality}'. Returning empty DataFrame.")
@@ -144,10 +144,10 @@ def compute_event_participation_percentage(
 
         # --- Unique competitors per event ---
         competitors_per_event = (
-            results.groupby("eventId", observed=True)["personId"]
+            results.groupby("event_id", observed=True)["person_id"]
             .nunique()
             .reset_index()
-            .rename(columns = {"eventId": "Event", "personId": "Competitors"})
+            .rename(columns = {"event_id": "Event", "person_id": "Competitors"})
             .assign(
                 pct = lambda x: (x["Competitors"] / total_competitors * 100).round(2)
             )
@@ -181,7 +181,7 @@ def compute_most_common_event_combinations(
         logger.info(f"Computing most common event combinations for competitions in {country}...")
 
         # --- Load competition data ---
-        competitions = db_tables["competitions"].query("countryId == @country").copy()
+        competitions = db_tables["competitions"].query("country_id == @country").copy()
 
         if competitions.empty:
             logger.warning(f"No competitions found for country '{country}'. Returning empty DataFrame.")
@@ -189,13 +189,13 @@ def compute_most_common_event_combinations(
 
         # --- Group by eventSpecs ---
         event_comb = (
-            competitions[["id", "eventSpecs"]]
-            .dropna(subset=["eventSpecs"])
-            .groupby("eventSpecs", observed=True)["id"]
+            competitions[["competition_id", "event_specs"]]
+            .dropna(subset=["event_specs"])
+            .groupby("event_specs", observed=True)["competition_id"]
             .nunique()
             .rename("Competitions")
             .reset_index()
-            .sort_values(by=["Competitions", "eventSpecs"], ascending=[False, True])
+            .sort_values(by=["Competitions", "event_specs"], ascending=[False, True])
             .reset_index(drop=True)
         )
 
@@ -229,16 +229,16 @@ def compute_average_events_per_competition(
 
         # --- Compute number of unique events per competition ---
         events_per_competition = (
-            results.groupby("competitionId", observed=True)["eventId"]
+            results.groupby("competition_id", observed=True)["event_id"]
             .nunique()
             .rename("Events")
         )
 
         # --- Compute average events per competitor ---
         avg_events_per_competition = (
-            results.groupby(["competitionId", "personId"], observed=True)["eventId"]
+            results.groupby(["competition_id", "person_id"], observed=True)["event_id"]
             .nunique()
-            .groupby("competitionId")
+            .groupby("competition_id")
             .mean()
             .rename("Avg Events per Competitor")
         )
@@ -252,7 +252,7 @@ def compute_average_events_per_competition(
         )
 
         avgevents.index += 1
-        avgevents.rename(columns={"competitionId": "Competition"}, inplace=True)
+        avgevents.rename(columns={"competition_id": "Competition"}, inplace=True)
 
         db_tables["avgevents"] = avgevents
 
@@ -320,16 +320,16 @@ def compute_bronze_membership(
         # --- Filter valid results ---
         first_result_date = (
             results
-            .query("best > 0 and eventId in @events")
+            .query("best > 0 and event_id in @events")
             .sort_values("date")
-            .groupby(["personId", "eventId"], observed=True, as_index=False)
+            .groupby(["person_id", "event_id"], observed=True, as_index=False)
             .first()  # earliest single for each event
         )
 
         # --- Count unique events completed per person ---
         events_per_person = (
             first_result_date
-            .groupby("personId", observed=True)["eventId"]
+            .groupby("person_id", observed=True)["event_id"]
             .nunique()
             .rename("num_events")
             .reset_index()
@@ -337,7 +337,7 @@ def compute_bronze_membership(
 
         # --- Identify bronze members ---
         bronze_ids = (
-            events_per_person.query("num_events == @num_events_needed")["personId"].tolist()
+            events_per_person.query("num_events == @num_events_needed")["person_id"].tolist()
         )
 
         if not bronze_ids:
@@ -346,21 +346,21 @@ def compute_bronze_membership(
 
         # --- Find when each bronze member completed their last required event ---
         last_event_date = (
-            first_result_date[first_result_date["personId"].isin(bronze_ids)]
+            first_result_date[first_result_date["person_id"].isin(bronze_ids)]
             .sort_values("date", ascending=False)
-            .groupby("personId", observed=True, as_index=False)
+            .groupby("person_id", observed=True, as_index=False)
             .first()
-            [["personId", "eventId", "date"]]
-            .rename(columns={"eventId": "Last Event", "date": "Completion Date"})
+            [["person_id", "event_id", "date"]]
+            .rename(columns={"event_id": "Last Event", "date": "Completion Date"})
         )
 
         # --- Merge with names ---
         bronze = (
-            persons[["id", "name"]]
+            persons[["wca_id", "name"]]
             .drop_duplicates()
-            .merge(last_event_date, left_on="id", right_on="personId", how="inner")
-            .drop(columns="personId")
-            .rename(columns={"id": "WCAID", "name": "Name"})
+            .merge(last_event_date, left_on="wca_id", right_on="person_id", how="inner")
+            .drop(columns="person_id")
+            .rename(columns={"wca_id": "WCAID", "name": "Name"})
             .sort_values("Completion Date", ascending=True)
             .reset_index(drop=True)
         )
@@ -398,16 +398,16 @@ def compute_silver_membership(
         # --- Filter valid results ---
         first_result_date = (
             results
-            .query("average > 0 and eventId in @events")
+            .query("average > 0 and event_id in @events")
             .sort_values("date")
-            .groupby(["personId", "eventId"], observed=True, as_index=False)
+            .groupby(["person_id", "event_id"], observed=True, as_index=False)
             .first()  # earliest average for each event
         )
 
         # --- Count unique events completed per person ---
         events_per_person = (
             first_result_date
-            .groupby("personId", observed=True)["eventId"]
+            .groupby("person_id", observed=True)["event_id"]
             .nunique()
             .rename("num_events")
             .reset_index()
@@ -415,7 +415,7 @@ def compute_silver_membership(
 
         # --- Identify silver members ---
         silver_ids = (
-            events_per_person.query("num_events == @num_events_needed")["personId"].tolist()
+            events_per_person.query("num_events == @num_events_needed")["person_id"].tolist()
         )
 
         if not silver_ids:
@@ -424,21 +424,21 @@ def compute_silver_membership(
 
         # --- Find when each bronze member completed their last required event ---
         last_event_date = (
-            first_result_date[first_result_date["personId"].isin(silver_ids)]
+            first_result_date[first_result_date["person_id"].isin(silver_ids)]
             .sort_values("date", ascending=False)
-            .groupby("personId", observed=True, as_index=False)
+            .groupby("person_id", observed=True, as_index=False)
             .first()
-            [["personId", "eventId", "date"]]
-            .rename(columns={"eventId": "Last Event", "date": "Completion Date"})
+            [["person_id", "event_id", "date"]]
+            .rename(columns={"event_id": "Last Event", "date": "Completion Date"})
         )
 
         # --- Merge with names ---
         silver = (
-            persons[["id", "name"]]
+            persons[["wca_id", "name"]]
             .drop_duplicates()
-            .merge(last_event_date, left_on="id", right_on="personId", how="inner")
-            .drop(columns="personId")
-            .rename(columns={"id": "WCAID", "name": "Name"})
+            .merge(last_event_date, left_on="wca_id", right_on="person_id", how="inner")
+            .drop(columns="person_id")
+            .rename(columns={"wca_id": "WCAID", "name": "Name"})
             .sort_values("Completion Date", ascending=True)
             .reset_index(drop=True)
         )
@@ -488,22 +488,22 @@ def compute_gold_membership(
                 championships["championship_type"].str.endswith("world"), "competition_id"
             ]
         )
-        wc_podium = results.query("competitionId in @wc_ids and pos <= 3")["personId"].unique()
+        wc_podium = results.query("competition_id in @wc_ids and pos <= 3")["person_id"].unique()
         wc_podium_set = set(wc_podium)
 
         # --- Continental / World records ---
-        record_cols = ["regionalSingleRecord", "regionalAverageRecord"]
-        record_df = results[record_cols + ["personId"]].copy()
+        record_cols = ["regional_single_record", "regional_average_record"]
+        record_df = results[record_cols + ["person_id"]].copy()
 
         has_wr = record_df[
             record_df[record_cols].apply(lambda x: x.str.contains("WR", na=False)).any(axis=1)
-        ]["personId"].unique()
+        ]["person_id"].unique()
 
         has_cr = record_df[
             record_df[record_cols].apply(
                 lambda x: x.notna() & ~x.str.contains("WR|NR", na=False)
             ).any(axis=1)
-        ]["personId"].unique()
+        ]["person_id"].unique()
 
         wr_set = set(has_wr)
         cr_set = set(has_cr)
@@ -527,10 +527,10 @@ def compute_gold_membership(
             return ", ".join(conds)
 
         gold = (
-            persons[["id", "name"]]
+            persons[["wca_id", "name"]]
             .drop_duplicates()
-            .query("id in @gold_ids")
-            .rename(columns={"id": "WCAID", "name": "Name"})
+            .query("wca_id in @gold_ids")
+            .rename(columns={"wca_id": "WCAID", "name": "Name"})
         )
         gold["Gold Condition"] = gold["WCAID"].apply(gold_condition)
 
@@ -577,22 +577,22 @@ def compute_platinum_membership(
                 championships["championship_type"].str.endswith("world"), "competition_id"
             ]
         )
-        wc_podium = results.query("competitionId in @wc_ids and pos <= 3")["personId"].unique()
+        wc_podium = results.query("competition_id in @wc_ids and pos <= 3")["person_id"].unique()
         wc_podium_set = set(wc_podium)
 
         # --- Continental / World records ---
-        record_cols = ["regionalSingleRecord", "regionalAverageRecord"]
-        record_df = results[record_cols + ["personId"]].copy()
+        record_cols = ["regional_single_record", "regional_average_record"]
+        record_df = results[record_cols + ["person_id"]].copy()
 
         has_wr = record_df[
             record_df[record_cols].apply(lambda x: x.str.contains("WR", na=False)).any(axis=1)
-        ]["personId"].unique()
+        ]["person_id"].unique()
 
         has_cr = record_df[
             record_df[record_cols].apply(
                 lambda x: x.notna() & ~x.str.contains("WR|NR", na=False)
             ).any(axis=1)
-        ]["personId"].unique()
+        ]["person_id"].unique()
 
         wr_set = set(has_wr)
         cr_set = set(has_cr)
@@ -608,10 +608,10 @@ def compute_platinum_membership(
             return pd.DataFrame(columns=["WCAID", "Name"])
 
         platinum = (
-            persons[["id", "name"]]
+            persons[["wca_id", "name"]]
             .drop_duplicates()
-            .query("id in @plat_ids")
-            .rename(columns={"id": "WCAID", "name": "Name"})
+            .query("wca_id in @plat_ids")
+            .rename(columns={"wca_id": "WCAID", "name": "Name"})
             .reset_index(drop=True)
         )
 
