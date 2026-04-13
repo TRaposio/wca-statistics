@@ -1,4 +1,4 @@
-cityName;province;regionName
+city_name;province;region_name
 Povo, Trento;TN;Trentino-Alto Adige
 Francavilla al Mare;CH;Abruzzo
 Varese;VA;Lombardia
@@ -71,6 +71,7 @@ Montemurlo, Prato;PO;Toscana
 Monticello Conte Otto (Vicenza);VI;Veneto
 Muggiò, Monza e Brianza;MB;Lombardia
 Muggiò;MB;Lombardia
+Muggiò ;MB;Lombardia
 Acerra, Napoli;NA;Campania
 Belluno;BL;Veneto
 Ispra (VA);VA;Lombardia
@@ -107,3 +108,10 @@ Borgo Valsugana;TN;Trentino-Alto Adige
 Borgo Valsugana, Trento;TN;Trentino-Alto Adige
 Vedelago;TV;Veneto
 Vigevano, Pavia;PV;Lombardia
+Bolzano, BZ, Trentino-Alto Adige;TN;Trentino-Alto Adige
+Casagiove, Caserta;CE;Campania
+Valverde, Catania;CT;Sicilia
+Cavarzere, VE, Veneto;VE;Veneto
+San Giuseppe Jato, Palermo, Sicilia;PA;Sicilia
+Minerbe, Verona;VE;Veneto
+Povo, Trento, TN, Trentino-Alto Adige;TN;Trentino-Alto Adige

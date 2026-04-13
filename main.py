@@ -15,14 +15,19 @@ def main():
 
     # --- Load all common tables once ---
     tables_to_load = [
-        "results", 
-        "competitions", 
-        "persons", 
-        "countries", 
-        "rounds", 
-        "ranks_single", 
+        "results",
+        "attempts",
+        "persons",
+        "competitions",
+        "events",
+        "formats",
+        "ranks_single",
         "ranks_average",
-        "championships"
+        "countries",
+        "continents",
+        "championships",
+        "rounds",
+        "scrambles",
     ]
     
     db_tables = {name: uw.read_table(name, config, logger) for name in tables_to_load}

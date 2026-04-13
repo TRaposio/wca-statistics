@@ -348,71 +348,96 @@ def read_aux_file(file_key: str, db_tables: dict, config: configparser.ConfigPar
 def make_localized_results_df(db_tables: dict, config: configparser.ConfigParser, logger: logging.Logger):
     
     """
-    Create 'results_nationality' — same as results, but with all personCountryId values
+    Create 'results_nationality' — same as results, but with all person_country_id values
     filtered by the nationality of config - and 'results_country' - same as results, 
-    but with all competitionId filtered by the country of config
+    but with all competition_id filtered by the country of config
     """
-
-    nationality_filter = config.nationality
-    country_filter = config.country
     
-    try:  
+    try:
+
+        logger.info("Creating pre-filtered result tables")
+
         # Rename column in competitions
-        db_tables["competitions"] = db_tables["competitions"].rename(columns = {'name':'competitionName'})
+        db_tables["competitions"] = (
+            db_tables["competitions"]
+            .rename(columns = {'name':'competition_name', 'id':'competition_id'})
+        )
         db_tables["competitions"]['date'] = pd.to_datetime(db_tables["competitions"][['year','month','day']])
 
-        logger.info("Renamed column name to competitionName in competitions dataframe")
+        db_tables["rounds"] = db_tables["rounds"].rename(columns = {'id':'round_type_id'})
 
         # Filter for nationality
-        results_filtered = db_tables["results"].query("personCountryId == @nationality_filter").copy()
-        
-        df = (
-            results_filtered
+        results_nationality = (
+            db_tables["results"]
+            .query("person_country_id == @config.nationality")
+            .copy()
             .merge(
                 db_tables["competitions"],
-                left_on="competitionId",
-                right_on="id",
+                on="competition_id",
                 how="left",
                 validate = "m:1"
             )
-            .drop('id', axis=1)
             .merge(
-                db_tables["rounds"][['id','rank']],
+                db_tables["rounds"][['round_type_id','rank']],
                 how='left',
-                left_on='roundTypeId',
-                right_on='id'
+                on='round_type_id',
+            )
+        )
+
+        db_tables["results_nationality"] = results_nationality
+
+        # Explode with result detail
+        results_nationality_detailed = (
+            results_nationality
+            .merge(
+                db_tables["attempts"],
+                left_on = 'id',
+                right_on = 'result_id',
+                how = 'left'
             )
             .drop('id', axis=1)
         )
 
-        db_tables["results_nationality"] = df
+        db_tables["results_nationality_detailed"] = results_nationality_detailed
 
         # Filter for host country
-        competitions_filtered = db_tables["competitions"].query("countryId == @country_filter").copy()
+        competitions_filtered = db_tables["competitions"].query("country_id == @config.country").copy()
 
-        df = (
+        results_country = (
             db_tables["results"]
             .merge(
                 competitions_filtered,
-                left_on="competitionId",
-                right_on="id",
+                on="competition_id",
                 how="inner",
                 validate = "m:1"
             )
-            .drop('id', axis=1)
             .merge(
-                db_tables["rounds"][['id','rank']],
+                db_tables["rounds"][['round_type_id','rank']],
                 how='left',
-                left_on='roundTypeId',
-                right_on='id'
+                on='round_type_id',
+            )
+        )
+
+        db_tables["results_country"] = results_country
+
+        # Explode with result detail
+        results_country_detailed = (
+            results_country
+            .merge(
+                db_tables["attempts"],
+                left_on = 'id',
+                right_on = 'result_id',
+                how = 'left'
             )
             .drop('id', axis=1)
         )
 
-        db_tables["results_country"] = df
+        db_tables["results_country_detailed"] = results_country_detailed
 
-        logger.info(f"Created 'results_nationality' from results+competitions with only competitors from country = {nationality_filter}.")
-        logger.info(f"Created 'results_country' from results+competitions with only competitions from country = {country_filter}.")
+        logger.info(f"Created 'results_nationality' from results+competitions with only competitors from country = {config.nationality}.")
+        logger.info(f"Created 'results_nationality_detailed' from results+competitions+attempts with only competitors from country = {config.nationality}.")
+        logger.info(f"Created 'results_country' from results+competitions with only competitions from country = {config.country}.")
+        logger.info(f"Created 'results_country_detailed' from results+competitions+attempts with only competitions from country = {config.country}.")
 
     except Exception as e:
         logger.critical(f"Error creating localized results dataframes: {e}", exc_info=True)
@@ -421,53 +446,50 @@ def make_localized_results_df(db_tables: dict, config: configparser.ConfigParser
 def fix_results_nationality(db_tables: dict, config: configparser.ConfigParser, logger: logging.Logger):
     
     """
-    Create 'results_fixed' — same as results_nationality, but with all personCountryId values
-    replaced by the competitor's latest nationality (subid=1).
+    Create 'results_fixed' — same as results_nationality, but with all person_country_id values
+    replaced by the competitor's latest nationality (sub_id=1).
     """
     
     try:
         persons = db_tables["persons"]
         results = db_tables["results"].copy()
         competitions = db_tables["competitions"]
-        rounds = db_tables["rounds"][['id','rank']]
+        rounds = db_tables["rounds"][['round_type_id','rank']]
 
-        logger.info("Creating results_fixed with standardized nationality (subid=1)...")
+        logger.info("Creating results table with standardized nationality (subid=1)...")
 
-        # Build mapping from personId → latest countryId
+        # Build mapping person_id → latest country_id
         nat_map = (
-            persons.loc[persons["subid"] == 1, ["id", "countryId"]]
-            .drop_duplicates(subset="id")
-            .set_index("id")["countryId"]
+            persons.loc[persons["sub_id"] == 1, ["wca_id", "country_id"]]
+            .drop_duplicates(subset="wca_id")
+            .set_index("wca_id")["country_id"]
             .to_dict()
         )
 
-        # Replace nationality efficiently
-        results["personCountryId"] = results["personId"].map(nat_map).fillna(results["personCountryId"])
+        # Replace nationality
+        results["person_country_id"] = results["person_id"].map(nat_map).fillna(results["person_country_id"])
 
-        # Recreate results_nationality
-        df = (
+        results_fixed = (
             results
-            .query("personCountryId == @config.nationality")
+            .query("person_country_id == @config.nationality")
+            .copy()
             .merge(
                 competitions,
-                left_on="competitionId",
-                right_on="id",
+                on="competition_id",
                 how="left",
                 validate = "m:1"
             )
-            .drop('id', axis=1)
             .merge(
                 rounds,
                 how='left',
-                left_on='roundTypeId',
-                right_on='id'
+                on='round_type_id',
             )
             .drop('id', axis=1)
         )
 
-        df['date'] = pd.to_datetime(df[['year','month','day']])
+        results_fixed['date'] = pd.to_datetime(results_fixed[['year','month','day']])
 
-        db_tables["results_fixed"] = df
+        db_tables["results_fixed"] = results_fixed
         logger.info("Added 'results_fixed' to db_tables.")
 
     except Exception as e:
@@ -481,9 +503,7 @@ def make_localized_rankings(db_tables: dict, config: configparser.ConfigParser, 
     Filter ranks_single and ranks_average for the given nationality
     """
 
-    nationality_filter = config.nationality
-
-    persons = db_tables["persons"].query("subid == 1")[['id','name','countryId']]
+    persons = db_tables["persons"].query("sub_id == 1")[['wca_id','name','country_id']]
 
     try:
         db_tables["ranks_single"] = (
@@ -491,16 +511,16 @@ def make_localized_rankings(db_tables: dict, config: configparser.ConfigParser, 
             .merge(
                 persons, 
                 how='left', 
-                left_on='personId', 
-                right_on='id'
+                left_on='person_id', 
+                right_on='wca_id'
             )
-            .drop('id', axis=1)
+            .drop('wca_id', axis=1)
         )
 
-        db_tables["ranks_single_nationality"] = db_tables["ranks_single"].query("countryId == @nationality_filter").copy()
+        db_tables["ranks_single_nationality"] = db_tables["ranks_single"].query("country_id == @config.nationality").copy()
 
         logger.info("Merged persons with ranks_single")
-        logger.info(f"Created 'ranks_single_nationality' with only competitors from country = {nationality_filter}.")
+        logger.info(f"Created 'ranks_single_nationality' with only competitors from country = {config.nationality}.")
 
     except Exception as e:
         logger.critical(f"Error during ranks_single/persons merge: {e}", exc_info=True)
@@ -511,16 +531,16 @@ def make_localized_rankings(db_tables: dict, config: configparser.ConfigParser, 
             .merge(
                 persons, 
                 how='left', 
-                left_on='personId', 
-                right_on='id'
+                left_on='person_id', 
+                right_on='wca_id'
             )
-            .drop('id', axis=1)
+            .drop('wca_id', axis=1)
         )
 
-        db_tables["ranks_average_nationality"] = db_tables["ranks_average"].query("countryId == @nationality_filter").copy()
+        db_tables["ranks_average_nationality"] = db_tables["ranks_average"].query("country_id == @config.nationality").copy()
 
         logger.info("Merged persons with ranks_average")
-        logger.info(f"Created 'ranks_average_nationality' with only competitors from country = {nationality_filter}.")
+        logger.info(f"Created 'ranks_average_nationality' with only competitors from country = {config.nationality}.")
 
     except Exception as e:
         logger.critical(f"Error during ranks_average/persons merge: {e}", exc_info=True)
@@ -532,30 +552,29 @@ def make_better_multi_results(db_tables: dict, config: configparser.ConfigParser
     Decode the wca multi encoding for easier computation of statistics
     """
 
-    results = db_tables["results"].query("eventId == '333mbf'").copy()
+    results = db_tables["results"].query("event_id == '333mbf'").copy()
 
     try:
         results = (
-            results
-            .melt(
-                id_vars=[col for col in results.columns if not col.startswith('value')],
-                value_vars=['value1', 'value2', 'value3', 'value4', 'value5'],
-                var_name='solve_index',
-                value_name='solve'
-            )
-            .query("solve != 0")
+            db_tables["attempts"]
             .copy()
-            .drop(columns = ["best", "average"])
+            .merge(
+                results,
+                left_on = 'result_id',
+                right_on = 'id',
+                how = 'inner'
+            )
+            .drop(columns = ["best", "average", "id"])
+            .query("value != 0")
+            .copy()
         )
 
-        results['solve_index'] = results['solve_index'].str.extract('(\d+)').astype(int)
-
-        results["attempted"] = results["solve"].apply(multiattempted)
-        results["solved"] = results["solve"].apply(multisolved)
+        results["attempted"] = results["value"].apply(multiattempted)
+        results["solved"] = results["value"].apply(multisolved)
         results["wrong"] = results["attempted"] - results["solved"]
         results["points"] = results["solved"] - results["wrong"]
-        results["time"] = results["solve"].apply(multitime)
-        results["display"] = results["solve"].apply(multiresult)
+        results["time"] = results["value"].apply(multitime)
+        results["display"] = results["value"].apply(multiresult)
 
         db_tables["multi_results"] = results
 
@@ -569,7 +588,7 @@ def make_better_multi_results(db_tables: dict, config: configparser.ConfigParser
 def process_tables(db_tables: dict[str, pd.DataFrame], config: configparser.ConfigParser, logger: logging.Logger) -> dict[str, pd.DataFrame]:
     
     """
-    Perform common operations on db_tables. e.g. Merges the 'results' and 'competitions' tables on 'competitionId' and filters rows to include only competitors from the configured country.
+    Perform common operations on db_tables. e.g. Merges the 'results' and 'competitions' tables on 'competition_id' and filters rows to include only competitors from the configured country.
     """
 
     logger.info("Preprocessing tables...")
@@ -588,7 +607,7 @@ def process_tables(db_tables: dict[str, pd.DataFrame], config: configparser.Conf
         logger.critical(f"Error during the listing of championships for championship type {config.championship_type}: {e}", exc_info=True)
 
     # Useful country lists
-    config.countries = list(db_tables["competitions"]['countryId'].drop_duplicates())
+    config.countries = list(db_tables["competitions"]['country_id'].drop_duplicates())
     config.real_countries = [x for x in config.countries if x not in config.multivenue]
 
     return db_tables
@@ -599,12 +618,12 @@ def check_missing_regions(db_tables: dict, config: configparser.ConfigParser, lo
     Check for competitions in the WCA database that are missing from the region mapping file.
     """
 
-    competitions = db_tables["competitions"].query("countryId == @config.country").copy()
+    competitions = db_tables["competitions"].query("country_id == @config.country").copy()
     mapping = db_tables["regions"]
 
     # --- Find unmapped competitionIds ---
-    mapped_ids = set(mapping["cityName"])
-    unmapped = set(competitions.loc[~(competitions["cityName"].isin(mapped_ids)), "cityName"])
+    mapped_ids = set(mapping["city_name"])
+    unmapped = set(competitions.loc[~(competitions["city_name"].isin(mapped_ids)), "city_name"])
     unmapped.remove('Multiple cities')
 
     if not unmapped:
@@ -614,7 +633,7 @@ def check_missing_regions(db_tables: dict, config: configparser.ConfigParser, lo
     regions_dir = get_regions_dir(config)
 
     out_path = regions_dir / f"missing_region_mappings_ita.csv"
-    pd.DataFrame(unmapped, columns=['cityName']).to_csv(out_path, index=False, sep=";")
+    pd.DataFrame(unmapped, columns=['city_name']).to_csv(out_path, index=False, sep=";")
 
     logger.info(f"Saved missing mapping list to: {out_path}")
 
