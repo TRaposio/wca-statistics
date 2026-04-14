@@ -31,8 +31,8 @@ def main():
     ]
     
     db_tables = {name: uw.read_table(name, config, logger) for name in tables_to_load}
-
     db_tables = uw.process_tables(db_tables, config, logger)
+    uw.export_db_schema(db_tables, config, logger)
 
     # --- check if mappers must be updated ---
     uw.read_aux_file("regions", db_tables, config, logger)

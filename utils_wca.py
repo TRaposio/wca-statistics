@@ -640,7 +640,47 @@ def check_missing_regions(db_tables: dict, config: configparser.ConfigParser, lo
     return unmapped
 
 
-def export_data(results: dict, figures: dict | None, section_name: str, config: configparser.ConfigParser, logger: logging.Logger | None = None) -> dict:
+def export_db_schema(
+    db_tables: dict, config: configparser.ConfigParser, logger: logging.Logger | None = None) -> None:
+    """
+    Export the schema of database tables (column names and dtypes) to a text file.
+    The output is intended for LLM consumption to improve prompting.
+    """
+
+    # --- Output folder ---
+    try:
+        output_dir = Path(config["paths"]["output_dir"])
+    except KeyError:
+        output_dir = Path("./output")
+        if logger:
+            logger.warning("Missing [paths]->output_dir in config.ini. Using './output'.")
+
+    # Ensure directory exists
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_file = output_dir / "db_schema.txt"
+
+    if logger:
+        logger.info("Starting schema export...")
+
+    with open(output_file, "w") as f:
+
+        f.write(f"Nationality: {config.nationality}\n")
+        f.write(f"Country: {config.country}\n\n")
+
+        for table_name, df in db_tables.items():
+            f.write(f"### {table_name}\n")
+
+            for col, dtype in df.dtypes.items():
+                f.write(f"{col}: {dtype}\n")
+
+            f.write("\n")
+
+    if logger:
+        logger.info(f"Schema successfully written to {output_file}")
+    
+
+
+def export_data(results: dict, figures: dict | None, section_name: str, config: configparser.ConfigParser, logger: logging.Logger | None = None) -> None:
     """
     Export module results: Excel + optional figures.
     """
