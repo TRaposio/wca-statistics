@@ -45,7 +45,7 @@ def compute_most_regions(
     Compute the number of unique Italian regions each competitor has competed in.
 
     This version expects a preloaded DataFrame `regions_df`
-    containing competitionId → regionId mappings.
+    containing competition_id → region_name mappings.
 
     """
 
@@ -55,16 +55,16 @@ def compute_most_regions(
 
         # --- Load datasets ---
         results = db_tables["results_fixed"].copy()
-        persons = db_tables["persons"][["id", "name"]].drop_duplicates().copy()
+        persons = db_tables["persons"][["wca_id", "name"]].drop_duplicates().copy()
         regions_df = db_tables["regions"]
 
         # --- Merge competition region data ---
-        df = results.merge(regions_df, how="inner", on="cityName")
+        df = results.merge(regions_df, how="inner", on="city_name")
 
         # --- Compute number of distinct regions per person ---
         region_counts = (
             df
-            .groupby("personId", observed=True)["regionName"]
+            .groupby("person_id", observed=True)["region_name"]
             .nunique()
             .rename("Number of Regions")
             .reset_index()
@@ -76,11 +76,11 @@ def compute_most_regions(
             .merge(
                 persons,
                 how="left",
-                left_on="personId",
-                right_on="id"
+                left_on="person_id",
+                right_on="wca_id"
             )
-            .drop(columns=["id"])
-            .rename(columns={"personId": "WCAID", "name": "Name"})
+            .drop(columns=["wca_id"])
+            .rename(columns={"person_id": "WCAID", "name": "Name"})
             .sort_values(by="Number of Regions", ascending=False)
             .reset_index(drop=True)
         )
@@ -105,7 +105,6 @@ def compute_average_win_times_by_region(
     Compute average winning times per event for each Italian region
     considering only the past N years of competitions (default 2).
 
-    TODO: multi is broken, the function is not efficient. Probabily best to calculate multi points
     """
 
     try:
@@ -118,34 +117,34 @@ def compute_average_win_times_by_region(
         # --- Filter for last two years ---
         latest_date = results["date"].max()
         cutoff = latest_date - pd.Timedelta(days=n_years * 365)
-        df = results.query("date >= @cutoff & pos == 1 & roundTypeId in ['c','f'] & best > 0").copy()
+        df = results.query("date >= @cutoff & pos == 1 & round_type_id in ['c','f'] & best > 0").copy()
         logger.info(f"Keeping results from {cutoff.date()} to {latest_date.date()}.")
 
         # --- Merge with region mapping ---
-        df = df.merge(region_map[["cityName", "regionName"]], on="cityName", how="left")
+        df = df.merge(region_map[["city_name", "region_name"]], on="city_name", how="left")
 
         # --- Handle metric selection ---
         # Special handling for 333fm based on formatId
-        df["eventId"] = np.where(
-            (df["eventId"] == "333fm") & (df["formatId"] == "1"),
+        df["event_id"] = np.where(
+            (df["event_id"] == "333fm") & (df["format_id"].isin(["1", "2"])),
             "333fm_1",
             np.where(
-                (df["eventId"] == "333fm") & (df["formatId"] == "m"),
+                (df["event_id"] == "333fm") & (df["format_id"] == "m"),
                 "333fm_m",
-                df["eventId"]
+                df["event_id"]
             )
         )
 
         # Special handling for multi: calculate points
         df["best"] = np.where(
-            df["eventId"] == "333mbf",
+            df["event_id"] == "333mbf",
             df["best"].apply(uw.multisolved) - df["best"].apply(uw.multiwrong),
             df["best"]
         )
 
         # --- Filter valid results ---
         df["metric"] = np.where(
-            df["eventId"].isin(["333bf", "444bf", "555bf", "333mbf", "333fm_1"]),
+            df["event_id"].isin(["333bf", "444bf", "555bf", "333mbf", "333fm_1"]),
             df["best"],
             df["average"]
         )
@@ -155,14 +154,14 @@ def compute_average_win_times_by_region(
 
         # --- Compute average per region and event ---
         region_event_avg = (
-            df.groupby(["regionName", "eventId"], observed=True)["metric"]
+            df.groupby(["region_name", "event_id"], observed=True)["metric"]
             .mean()
             .reset_index()
         )
 
          # --- Post-process metrics by event type ---
         def convert_metric(row):
-            event = row["eventId"]
+            event = row["event_id"]
             val = row["metric"]
 
             if pd.isna(val) or val <= 0:
@@ -184,7 +183,7 @@ def compute_average_win_times_by_region(
 
         # --- Pivot to wide format ---
         pivot_df = region_event_avg.pivot(
-            index="regionName", columns="eventId", values="metric"
+            index="region_name", columns="event_id", values="metric"
         ).reset_index()
 
         # --- Sort by 3x3 speed ---
@@ -217,7 +216,7 @@ def plot_italy_competition_distribution(
 
         logger.info("Creating Italian competition distribution map...")
 
-        comps = db_tables["competitions"].query("countryId == 'Italy' & cancelled == 0").copy()
+        comps = db_tables["competitions"].query("country_id == 'Italy' & cancelled == 0").copy()
         city_to_region = db_tables["regions"].copy()
 
         comps["date"] = pd.to_datetime(
@@ -233,8 +232,8 @@ def plot_italy_competition_distribution(
         df = (
             comps
             .merge(
-                city_to_region[["cityName", "regionName"]],
-                on="cityName",
+                city_to_region[["city_name", "region_name"]],
+                on="city_name",
                 how="left",
                 validate="m:1"
             )
@@ -243,19 +242,19 @@ def plot_italy_competition_distribution(
         # --- Count competitions per region ---
         comp_per_region = (
             df
-            .groupby("regionName", observed=True)["id"]
+            .groupby("region_name", observed=True)["competition_id"]
             .nunique()
             .reset_index()
-            .rename(columns={"id": "Competitions"})
+            .rename(columns={"competition_id": "Competitions"})
         )
 
         # --- Merge ISTAT codes ---
         df_regions = (
             pd.DataFrame.from_dict(REGIONS_DICT, orient="index")
             .reset_index()
-            .rename(columns={"index": "regionName", 0: "COD_REG"})
+            .rename(columns={"index": "region_name", 0: "COD_REG"})
         )
-        region_counts = df_regions.merge(comp_per_region, on="regionName", how="left").fillna(0)
+        region_counts = df_regions.merge(comp_per_region, on="region_name", how="left").fillna(0)
 
         # --- Load shapefile ---
         shp_dir = Path(config["paths"]["shapefile_dir"])
@@ -344,13 +343,13 @@ def plot_competition_locations(
 
         # --- Filter valid competitions ---
         if championship:
-            df = comps.query("cityName != 'Multiple cities' & countryId == 'Italy' & id in @config.nats").drop_duplicates(subset=["id"])
+            df = comps.query("city_name != 'Multiple cities' & country_id == 'Italy' & competition_id in @config.nats").drop_duplicates(subset=["competition_id"])
         else:
-            df = comps.query("cityName != 'Multiple cities' & countryId == 'Italy'").drop_duplicates(subset=["id"])
+            df = comps.query("city_name != 'Multiple cities' & country_id == 'Italy'").drop_duplicates(subset=["competition_id"])
 
         # --- Convert microdegrees to decimal ---
-        df["latitude"] = df["latitude"] / 1000000
-        df["longitude"] = df["longitude"] / 1000000
+        df["latitude"] = df["latitude_microdegrees"] / 1000000
+        df["longitude"] = df["longitude_microdegrees"] / 1000000
 
         # --- Drop missing coordinates ---
         df = df.dropna(subset=["latitude", "longitude"])

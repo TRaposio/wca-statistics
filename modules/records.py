@@ -20,14 +20,14 @@ def compute_national_records_single(
         logger.info("Computing national single records")
 
         ranks_s = db_tables["ranks_single_nationality"]
-        results = db_tables["results_nationality"].query("eventId in @config.current_events")
+        results = db_tables["results_nationality"].query("event_id in @config.current_events")
 
         nrs = (
-            ranks_s.query("countryRank == 1 & eventId in @config.current_events")
-            [["personId", "name", "eventId", "best"]]
+            ranks_s.query("country_rank == 1 & event_id in @config.current_events")
+            [["person_id", "name", "event_id", "best"]]
             .merge(
-                results[['personId','eventId','best','competitionId','date']], 
-                    on=['personId','eventId','best'],
+                results[['person_id','event_id','best','competition_id','date']], 
+                    on=['person_id','event_id','best'],
                     how="left"
             )
             .rename(columns={"best": "result"})
@@ -35,16 +35,16 @@ def compute_national_records_single(
 
         if nrs.empty:
             logger.warning("No national single records found.")
-            return pd.DataFrame(columns=["personId", "name", "eventId", "type", "result", "competitionId", "date"])
+            return pd.DataFrame(columns=["person_id", "name", "event_id", "type", "result", "competition_id", "date"])
 
         nrs["type"] = "single"
 
         # Format results for readability
         nrs["formatted_result"] = np.where(
-            nrs["eventId"] == "333mbf",
+            nrs["event_id"] == "333mbf",
             nrs["result"].apply(uw.multiresult),
             np.where(
-                nrs["eventId"] == '333fm',
+                nrs["event_id"] == '333fm',
                 nrs["result"].astype(str),
                 nrs["result"].apply(uw.timeconvert)
             )
@@ -53,7 +53,7 @@ def compute_national_records_single(
         db_tables["national_records_single"] = nrs
         
         logger.info(f"Computed {len(nrs)} national single records for {config.nationality}")
-        return nrs[["personId", "name", "eventId", "type", "formatted_result", "competitionId", "date"]]
+        return nrs[["person_id", "name", "event_id", "type", "formatted_result", "competition_id", "date"]]
 
     except Exception as e:
         logger.critical(f"Error while computing national single records: {e}")
@@ -72,15 +72,15 @@ def compute_national_records_average(
         logger.info("Computing national single records")
 
         ranks_a = db_tables["ranks_average_nationality"]
-        results = db_tables["results_nationality"].query("eventId in @config.current_events")
+        results = db_tables["results_nationality"].query("event_id in @config.current_events")
 
         nra = (
-            ranks_a.query("countryRank == 1 & eventId in @config.current_events")
-            [["personId", "name", "eventId", "best"]]
+            ranks_a.query("country_rank == 1 & event_id in @config.current_events")
+            [["person_id", "name", "event_id", "best"]]
             .merge(
-                results[['personId','eventId','average','competitionId','date']], 
-                    left_on=['personId','eventId','best'],
-                    right_on=['personId','eventId','average'],
+                results[['person_id','event_id','average','competition_id','date']], 
+                    left_on=['person_id','event_id','best'],
+                    right_on=['person_id','event_id','average'],
                     how="left"
             )
             .drop(columns="best")
@@ -89,13 +89,13 @@ def compute_national_records_average(
 
         if nra.empty:
             logger.warning("No national average records found.")
-            return pd.DataFrame(columns=["personId", "name", "eventId", "type", "result", "competitionId", "date"])
+            return pd.DataFrame(columns=["person_id", "name", "event_id", "type", "result", "competition_id", "date"])
 
         nra["type"] = "average"
 
         # Format results for readability
         nra["formatted_result"] = np.where(
-            nra["eventId"] == '333fm',
+            nra["event_id"] == '333fm',
             (nra["result"]/100).astype(str),
             nra["result"].apply(uw.timeconvert)
         )
@@ -104,7 +104,7 @@ def compute_national_records_average(
         db_tables["national_records_average"] = nra
 
         logger.info(f"Computed {len(nra)} national single records for {config.nationality}")
-        return nra[["personId", "name", "eventId", "type", "formatted_result", "competitionId", "date"]]
+        return nra[["person_id", "name", "event_id", "type", "formatted_result", "competition_id", "date"]]
 
     except Exception as e:
         logger.critical(f"Error while computing national average records: {e}")
@@ -127,7 +127,7 @@ def compute_oldest_standing_records(
 
         if nrs.empty and nra.empty:
             logger.warning("No record data available to compute oldest standing records.")
-            return pd.DataFrame(columns=["personId", "name", "eventId", "type", "formatted_result", "date", "days"])
+            return pd.DataFrame(columns=["person_id", "name", "event_id", "type", "formatted_result", "date", "days"])
 
         combined = pd.concat([nrs, nra], ignore_index=True)
 
@@ -138,7 +138,7 @@ def compute_oldest_standing_records(
         logger.info(f"Computed {len(combined)} oldest standing records")
 
         return combined[[
-            "personId", "name", "eventId", "type", "formatted_result", "date", "days"
+            "person_id", "name", "event_id", "type", "formatted_result", "date", "days"
         ]]
 
     except Exception as e:
@@ -160,7 +160,7 @@ def compute_country_world_continental_records(
 
         results = db_tables["results_nationality"]
 
-        subset = results.query("eventId in @config.current_events and best > 0")
+        subset = results.query("event_id in @config.current_events and best > 0")
 
         if subset.empty:
             logger.warning("No World or European records found.")
@@ -168,27 +168,27 @@ def compute_country_world_continental_records(
             return pd.DataFrame()
 
         # --- Single records ---
-        single_records = subset.query("regionalSingleRecord in ['WR', 'ER']").copy()
+        single_records = subset.query("regional_single_record in ['WR', 'ER']").copy()
         single_records = single_records[[
-            "personId", "personName", "eventId", "competitionId",
-            "competitionName", "date", "best", "regionalSingleRecord"
+            "person_id", "person_name", "event_id", "competition_id",
+            "competition_name", "date", "best", "regional_single_record"
         ]]
         single_records["type"] = "single"
         single_records = single_records.rename(columns={
             "best": "result",
-            "regionalSingleRecord": "record_type"
+            "regional_single_record": "record_type"
         })
 
         # --- Average records ---
-        average_records = subset.query("regionalAverageRecord in ['WR', 'ER']").copy()
+        average_records = subset.query("regional_average_record in ['WR', 'ER']").copy()
         average_records = average_records[[
-            "personId", "personName", "eventId", "competitionId",
-            "competitionName", "date", "average", "regionalAverageRecord"
+            "person_id", "person_name", "event_id", "competition_id",
+            "competition_name", "date", "average", "regional_average_record"
         ]]
         average_records["type"] = "average"
         average_records = average_records.rename(columns={
             "average": "result",
-            "regionalAverageRecord": "record_type"
+            "regional_average_record": "record_type"
         })
 
         # --- Combine and sort chronologically ---
@@ -200,10 +200,10 @@ def compute_country_world_continental_records(
 
         # --- Format results for readability ---
         records["formatted_result"] = np.where(
-            records["eventId"] == "333mbf",
+            records["event_id"] == "333mbf",
             records["result"].apply(uw.multiresult),
             np.where(
-                records["eventId"] == '333fm',
+                records["event_id"] == '333fm',
                 records["result"].astype(str),
                 records["result"].apply(uw.timeconvert)
             )
@@ -214,9 +214,9 @@ def compute_country_world_continental_records(
         logger.info(f"Computed {len(records)} world/continental records")
 
         return records[[
-            "personId", "personName", "eventId", "type",
+            "person_id", "person_name", "event_id", "type",
             "formatted_result", "record_type",
-            "competitionId", "competitionName", "date"
+            "competition_id", "competition_name", "date"
         ]]
 
     except Exception as e:
@@ -237,9 +237,9 @@ def compute_event_record_history(
     try:
         logger.info(f"Computing national/world record history for event {event_id}")
 
-        results_nationality = db_tables["results_nationality"].query("eventId == @event_id").copy()
-        results = db_tables["results"].query("eventId == @event_id").copy()
-        competitions = db_tables["competitions"][["id", "date"]]
+        results_nationality = db_tables["results_nationality"].query("event_id == @event_id").copy()
+        results = db_tables["results"].query("event_id == @event_id").copy()
+        competitions = db_tables["competitions"][["competition_id", "date"]]
         nationality = config.nationality
 
         # --- Filter to target event only ---
@@ -251,54 +251,54 @@ def compute_event_record_history(
 
         # --- National record SINGLE history ---
         nrs = results_nationality.query(
-            "regionalSingleRecord in ['NR', 'ER', 'WR']"
-        )[["personId", "personName", "competitionId", "best", "date"]].copy()
+            "regional_single_record in ['NR', 'ER', 'WR']"
+        )[["person_id", "person_name", "competition_id", "best", "date"]].copy()
         nrs = nrs.rename(columns={
-            "personId": "WCAID",
-            "personName": "Name",
+            "person_id": "WCAID",
+            "person_name": "Name",
             "best": "NR single"
         }).sort_values(by=["date", "NR single"], ascending=[True, False])
 
         # --- National record AVERAGE history ---
         nra = results_nationality.query(
-            "regionalAverageRecord in ['NR', 'ER', 'WR']"
-        )[["personId", "personName", "competitionId", "average", "date"]].copy()
+            "regional_average_record in ['NR', 'ER', 'WR']"
+        )[["person_id", "person_name", "competition_id", "average", "date"]].copy()
         nra = nra.rename(columns={
-            "personId": "WCAID",
-            "personName": "Name",
+            "person_id": "WCAID",
+            "person_name": "Name",
             "average": "NR average"
         }).sort_values(by=["date", "NR average"], ascending=[True, False])
 
         # --- World record SINGLE history ---
         wrs = results.query(
-            "regionalSingleRecord == 'WR' and eventId == @event_id"
+            "regional_single_record == 'WR' and event_id == @event_id"
         ).copy()
 
         wrs = (
             wrs
             .rename(columns={
-                "personId": "WCAID",
-                "personName": "Name",
+                "person_id": "WCAID",
+                "person_name": "Name",
                 "best": "WR single"
             })
-            .merge(competitions, left_on="competitionId", right_on="id")
-            [["WCAID", "Name", "competitionId", "WR single", "date"]]
+            .merge(competitions, on="competition_id")
+            [["WCAID", "Name", "competition_id", "WR single", "date"]]
             .sort_values(by=["date", "WR single"], ascending=[True, False])
         )
 
         # --- World record AVERAGE history ---
         wra = results.query(
-            "regionalAverageRecord == 'WR' and eventId == @event_id"
+            "regional_average_record == 'WR' and event_id == @event_id"
         ).copy()
 
         wra = (
             wra.rename(columns={
-                "personId": "WCAID",
-                "personName": "Name",
+                "person_id": "WCAID",
+                "person_name": "Name",
                 "average": "WR average"
             })
-            .merge(competitions, left_on="competitionId", right_on="id")
-            [["WCAID", "Name", "competitionId", "WR average", "date"]]
+            .merge(competitions, on="competition_id")
+            [["WCAID", "Name", "competition_id", "WR average", "date"]]
             .sort_values(by=["date", "WR average"], ascending=[True, False])
         )
 
@@ -325,7 +325,7 @@ def compute_event_record_history(
         out = pd.concat([nrs, nra]).sort_values(by="date")
 
         logger.info(f"Record history computed for event {event_id}")
-        return out[["WCAID", "Name", "competitionId", "date", "NR single", "NR average"]].iloc[:-2, :]
+        return out[["WCAID", "Name", "competition_id", "date", "NR single", "NR average"]].iloc[:-2, :]
 
     except Exception as e:
         logger.critical(f"Error while computing record history for {event_id}: {e}")
@@ -490,8 +490,8 @@ def plot_national_record_month_distribution(
         logger.info(f"Plotting monthly distribution of national records for {config.nationality}")
 
         results = db_tables["results_nationality"]
-        countries = db_tables["countries"].query("continentId == '_Europe'")["id"].unique()
-        competitions = db_tables["competitions"].query("countryId in @countries")
+        countries = db_tables["countries"].query("continent_id == '_Europe'")["id"].unique()
+        competitions = db_tables["competitions"].query("country_id in @countries")
 
         if results.empty or competitions.empty:
             logger.warning("Missing results or competitions data for month distribution plot.")
@@ -499,7 +499,7 @@ def plot_national_record_month_distribution(
 
         # --- Extract month of each record (single or average) ---
         records = results.query(
-            "regionalSingleRecord in ['NR','ER','WR'] or regionalAverageRecord in ['NR','ER','WR']"
+            "regional_single_record in ['NR','ER','WR'] or regional_average_record in ['NR','ER','WR']"
         ).copy()
 
         if records.empty:
