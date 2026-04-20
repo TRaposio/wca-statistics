@@ -562,6 +562,123 @@ def plot_kinch_analysis_national(
     )
  
  
+def plot_country_kinch_vs_size(
+    db_tables: dict,
+    config: configparser.ConfigParser,
+    logger: logging.Logger,
+    country_kinch: pd.DataFrame,
+) -> plt.Figure:
+    """
+    Scatterplot of country-level Kinch score against country "size"
+    (number of distinct competitors, log10). Fits a linear trend line,
+    highlights the configured home country, and labels outliers (points
+    farthest from the trend).
+
+    Optional [plot] config keys:
+        country_kinch_min_competitors   (default 25)
+        country_kinch_outlier_percentile (default 95)
+    """
+    try:
+        logger.info("Creating Country Kinch vs country size scatterplot")
+
+        # --- Tunables (with defaults matching the original script) ---
+        min_competitors = int(config["plot"].get("country_kinch_min_competitors", 25))
+        outlier_pct = float(config["plot"].get("country_kinch_outlier_percentile", 95))
+
+        # --- Country size = number of distinct competitors (current nationality) ---
+        persons = db_tables["persons"]
+        size = (
+            persons[persons["sub_id"] == 1]
+            .groupby("country_id", as_index=False)["wca_id"].count()
+            .rename(columns={"wca_id": "n", "country_id": "Country"})
+        )
+
+        # --- Merge with country Kinch, apply threshold, log-scale size ---
+        df = (
+            country_kinch[["Country", "Kinch"]]
+            .merge(size, on="Country", how="inner")
+            .query("n >= @min_competitors")
+            .copy()
+        )
+        df["n_log"] = np.log10(df["n"])
+
+        if df.empty:
+            logger.warning(
+                f"No countries with >= {min_competitors} competitors; skipping plot."
+            )
+            return None
+
+        # --- Linear regression on (log_n, Kinch) ---
+        slope, intercept = np.polyfit(df["n_log"].to_numpy(), df["Kinch"].to_numpy(), 1)
+        df["predicted"] = intercept + slope * df["n_log"]
+
+        # --- Outliers: points farthest from the regression line ---
+        distances = (df["Kinch"] - df["predicted"]).abs()
+        threshold = np.percentile(distances, outlier_pct)
+        outliers = df[distances >= threshold]
+
+        # --- Plot ---
+        fig, ax = plt.subplots()
+
+        ax.scatter(df["n_log"], df["Kinch"], zorder=2, label="Country")
+
+        # Trend line (sort to draw a clean segment)
+        order = df["n_log"].argsort()
+        ax.plot(
+            df["n_log"].iloc[order],
+            df["predicted"].iloc[order],
+            color="red",
+            zorder=5,
+            label="Linear trend",
+        )
+
+        # Outliers
+        ax.scatter(
+            outliers["n_log"], outliers["Kinch"],
+            color="red", edgecolor="black", linewidth=1, zorder=3,
+            label="Outliers",
+        )
+        for _, row in outliers.iterrows():
+            ax.annotate(
+                row["Country"],
+                (row["n_log"], row["Kinch"]),
+                xytext=(-5, 5), textcoords="offset points", fontsize=8,
+            )
+
+        # Highlight home country
+        home = df[df["Country"] == config.country]
+        if not home.empty:
+            ax.scatter(
+                home["n_log"], home["Kinch"],
+                color="#00FF00", edgecolor="black", linewidth=1, zorder=4,
+                label=config.country,
+            )
+            for _, row in home.iterrows():
+                ax.annotate(
+                    row["Country"],
+                    (row["n_log"], row["Kinch"]),
+                    xytext=(-5, 5), textcoords="offset points", fontsize=8,
+                )
+        else:
+            logger.warning(
+                f"Home country '{config.country}' not in plot "
+                f"(missing from country Kinch or below {min_competitors} competitors)."
+            )
+
+        ax.set_title("Country Kinch against country's competitors", fontweight="bold")
+        ax.set_xlabel("Number of competitors (log\u2081\u2080)", fontweight="bold")
+        ax.set_ylabel("Overall Kinch", fontweight="bold")
+        ax.grid(True, which="major", zorder=1)
+        ax.legend(loc="best", fontsize=8)
+
+        fig.tight_layout()
+        plt.close(fig)
+        return fig
+
+    except Exception as e:
+        logger.critical(f"Error creating Country Kinch vs size scatterplot: {e}", exc_info=True)
+
+
 ###################################################################
 ############################### RUN ###############################
 ###################################################################
@@ -589,7 +706,9 @@ def run(db_tables, config):
     figures = {}
     figures.update(plot_kinch_analysis(config=config, logger=logger, kinch_ranking=kinch_world, top_n=10))
     figures.update(plot_kinch_analysis_national(config=config, logger=logger, kinch_ranking=kinch_national, top_n=10))
+    figures["Country Kinch vs Size"] = plot_country_kinch_vs_size(
+        db_tables=db_tables, config=config, logger=logger, country_kinch=kinch_country
+    )
  
     section_name = __name__.split(".")[-1]
     uw.export_data(results, figures=figures, section_name=section_name, config=config, logger=logger)
- 
