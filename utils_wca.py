@@ -95,7 +95,20 @@ def setup_logger(name: str, level=logging.INFO, log_root: Path | str = "./logs")
 
 def load_config(logger: logging.Logger, config_path: str | Path = "config.ini") -> configparser.ConfigParser:
     """
-    Import the config file.
+    Import the config file and attach commonly-used attributes to it.
+
+    Attributes set here (available immediately after this call):
+        config.current_events, config.multivenue : list[str]
+        config.year                              : int
+        config.country, config.nationality       : str   (must match countries.tsv `name`)
+        config.championship_type                 : str   (e.g. "IT", "US")
+        config.figure_size, config.dpi           : plot defaults
+
+    Attributes set later by `process_tables` (require db_tables to be loaded):
+        config.continent_id            : str   (e.g. "_Europe", "_Asia") — derived from countries
+        config.continental_record_name : str   (e.g. "ER", "AsR")       — derived from continents
+        config.nats                    : list[str] — competition_ids of national championships
+        config.countries, config.real_countries : list[str]
     """
 
     logger.info(f"Gathering info from config {config_path}")
@@ -310,7 +323,8 @@ def read_aux_file(file_key: str, db_tables: dict, config: configparser.ConfigPar
     Example
     -------
     read_aux_file("regions", db_tables, config, logger)
-    -> loads ./data/regions/ita_city_to_region_map.csv into db_tables["regions"]
+    -> loads the file pointed to by config["aux_files"]["regions"]
+       (e.g. "city_to_region_map_ita.csv") into db_tables["regions"]
     """
 
     # --- Validate config ---
@@ -589,6 +603,11 @@ def process_tables(db_tables: dict[str, pd.DataFrame], config: configparser.Conf
     
     """
     Perform common operations on db_tables. e.g. Merges the 'results' and 'competitions' tables on 'competition_id' and filters rows to include only competitors from the configured country.
+
+    Also attaches country-agnostic attributes to `config`:
+        config.continent_id            (e.g. "_Europe")
+        config.continental_record_name (e.g. "ER", "AsR", "AfR", "NAR", "SAR", "OcR")
+        config.nats                    (list of national championship competition_ids)
     """
 
     logger.info("Preprocessing tables...")
@@ -598,13 +617,49 @@ def process_tables(db_tables: dict[str, pd.DataFrame], config: configparser.Conf
     make_localized_rankings(db_tables, config, logger)
     make_better_multi_results(db_tables, config, logger)
 
+    # --- Derive continent + continental record name from the configured country ---
+    # This makes records, podiums, etc. country-agnostic: an Italian setup gets "ER",
+    # a Chinese setup gets "AsR", a Brazilian setup gets "SAR", and so on.
+    countries = db_tables["countries"]
+    continents = db_tables["continents"]
+
+    country_row = countries[countries["id"] == config.country]
+    if country_row.empty:
+        logger.critical(
+            f"Country '{config.country}' not found in countries table. "
+            f"Make sure config.country matches a row in countries.tsv (the `id`/`name` field)."
+        )
+
+    config.continent_id = country_row["continent_id"].iloc[0]
+
+    continent_row = continents[continents["id"] == config.continent_id]
+    if continent_row.empty:
+        logger.critical(
+            f"Continent '{config.continent_id}' not found in continents table."
+        )
+
+    config.continental_record_name = continent_row["record_name"].iloc[0]
+    logger.info(
+        f"Country '{config.country}' is in continent '{config.continent_id}' "
+        f"(continental record name: '{config.continental_record_name}')."
+    )
+
     # --- Extract list of championships ---
     try:
-        config.nats = list(db_tables["championships"][db_tables["championships"]['championship_type'] == config.championship_type]['competition_id'])
-        logger.info("extracted list of national championships")
+        config.nats = list(
+            db_tables["championships"]
+            [db_tables["championships"]['championship_type'] == config.championship_type]
+            ['competition_id']
+        )
+        logger.info(f"Extracted {len(config.nats)} national championship(s) for type '{config.championship_type}'")
 
     except Exception as e:
-        logger.critical(f"Error during the listing of championships for championship type {config.championship_type}: {e}", exc_info=True)
+        logger.critical(
+            f"Error during the listing of championships for championship type "
+            f"{config.championship_type}: {e}",
+            exc_info=True,
+        )
+        raise
 
     # Useful country lists
     config.countries = list(db_tables["competitions"]['country_id'].drop_duplicates())
@@ -616,6 +671,10 @@ def process_tables(db_tables: dict[str, pd.DataFrame], config: configparser.Conf
 def check_missing_regions(db_tables: dict, config: configparser.ConfigParser, logger: logging.Logger | None = None) -> set: 
     """
     Check for competitions in the WCA database that are missing from the region mapping file.
+
+    Note: this is currently only meaningful for countries that have a region-mapping
+    auxiliary file (today: Italy). For other countries, `db_tables["regions"]` will be
+    absent or empty and this check should not be invoked.
     """
 
     competitions = db_tables["competitions"].query("country_id == @config.country").copy()
@@ -624,15 +683,15 @@ def check_missing_regions(db_tables: dict, config: configparser.ConfigParser, lo
     # --- Find unmapped competitionIds ---
     mapped_ids = set(mapping["city_name"])
     unmapped = set(competitions.loc[~(competitions["city_name"].isin(mapped_ids)), "city_name"])
-    unmapped.remove('Multiple cities')
+    unmapped.discard('Multiple cities')   # discard = no error if absent
 
     if not unmapped:
-        logger.info("All Italian competitions have a region assigned. No missing mappings.")
+        logger.info(f"All {config.country} competitions have a region assigned. No missing mappings.")
 
-    # --- Save to CSV ---
+    # --- Save to CSV (filename is country-tagged) ---
     regions_dir = get_regions_dir(config)
-
-    out_path = regions_dir / f"missing_region_mappings_ita.csv"
+    country_tag = config.country.lower().replace(" ", "_")
+    out_path = regions_dir / f"missing_region_mappings_{country_tag}.csv"
     pd.DataFrame(unmapped, columns=['city_name']).to_csv(out_path, index=False, sep=";")
 
     logger.info(f"Saved missing mapping list to: {out_path}")
