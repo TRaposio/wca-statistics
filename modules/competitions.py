@@ -20,7 +20,7 @@ def compute_most_competitions(
         logger.info("Computing most competitions per competitor...")
 
         results = db_tables["results_fixed"]
-        persons = db_tables["persons"].query("sub_id = 1").copy()
+        persons = db_tables["persons"].query("sub_id == 1").copy()
 
         df_counts = (
             results.groupby("person_id")["competition_id"]
@@ -56,7 +56,7 @@ def compute_most_countries(
         logger.info("Computing most countries per competitor...")
 
         results = db_tables["results_fixed"]
-        persons = db_tables["persons"].query("sub_id = 1").copy()
+        persons = db_tables["persons"].query("sub_id == 1").copy()
 
         df_counts = (
             results.query("country_id not in @config.multivenue")
