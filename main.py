@@ -43,10 +43,10 @@ def main():
 
     # --- Run modules, passing the preloaded tables ---
     # competitions.run(db_tables, config)
-    events.run(db_tables, config)
+    # events.run(db_tables, config)
     # regions.run(db_tables, config)
     # championships.run(db_tables, config)
-    # relays.run(db_tables, config)
+    relays.run(db_tables, config)
     # records.run(db_tables, config)
     # sor_kinch.run(db_tables, config)
 
