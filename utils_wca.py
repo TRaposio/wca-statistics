@@ -687,6 +687,7 @@ def check_missing_regions(db_tables: dict, config: configparser.ConfigParser, lo
 
     if not unmapped:
         logger.info(f"All {config.country} competitions have a region assigned. No missing mappings.")
+        return unmapped   # nothing to save, skip writing an empty file
 
     # --- Save to CSV (filename is country-tagged) ---
     regions_dir = get_regions_dir(config)

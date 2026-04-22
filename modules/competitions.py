@@ -174,15 +174,13 @@ def compute_community_recency(
             f"Computing percentage of each country's competitors that has competed after {threshold}..."
         )
 
-        df = db_tables["results"].copy()
-
         threshold_year = pd.to_datetime(threshold).year
-        df["competition_year"] = (
-            df["competition_id"]
-            .str.extract(r"(\d{4})$")[0]
-            .astype(float)
-        )
-        df["post_covid"] = df["competition_year"] >= threshold_year
+
+        results = db_tables["results"][["person_country_id", "person_id", "competition_id"]]
+        comp_year = db_tables["competitions"][["competition_id", "year"]]
+
+        df = results.merge(comp_year, on="competition_id", how="left")
+        df["post_covid"] = df["year"] >= threshold_year
 
         post_covid = (
             df.groupby(["person_country_id", "person_id"])["post_covid"]
@@ -338,8 +336,6 @@ def plot_competition_distribution(
 
         fig, ax = plt.subplots()
         ax.plot(df["year"], df["Number of Competitions"], color="tab:blue", marker="o", linewidth=2, zorder=2)
-
-        ax.legend(loc="upper left")
 
         ax.set_title(f"Competitions per Year - {config.country}", fontweight="bold")
         ax.set_xlabel("Year", fontweight="bold")

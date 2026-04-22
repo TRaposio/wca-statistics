@@ -103,8 +103,10 @@ def compute_national_championship_medal_table(
     Compute the national championship medal table.
     If `event` is provided, restrict to that event only.
     """
+    event_label = f"event {event}" if event else "all events"
+
     try:
-        logger.info(f"Computing national championship medal table{' for ' + event if event else ''}")
+        logger.info(f"Computing national championship medal table for {event_label}")
 
         results = db_tables["results_nationality"]
         persons = db_tables["persons"][["wca_id", "name"]].drop_duplicates()
@@ -117,7 +119,7 @@ def compute_national_championship_medal_table(
             solve = solve.query("event_id == @event").copy()
 
         if solve.empty:
-            logger.warning(f"No championship results found{' for event ' + event if event else ''}.")
+            logger.warning(f"No championship results found for {event_label}.")
             return pd.DataFrame(columns=["WCAID", "Name", "gold", "silver", "bronze", "podiums"])
 
         # --- Compute ranking positions per competition/event ---
@@ -142,15 +144,12 @@ def compute_national_championship_medal_table(
         )
         medal_table.index += 1
 
-        logger.info(
-            f"Medal table computed ({len(medal_table)} competitors)"
-            f"{' for event ' + event if event else ''}"
-        )
+        logger.info(f"Medal table computed ({len(medal_table)} competitors) for {event_label}")
         return medal_table[["WCAID", "Name", "gold", "silver", "bronze", "podiums"]]
 
     except Exception as e:
         logger.error(
-            f"Error while computing medal table{' for event ' + event if event else ''}: {e}",
+            f"Error while computing medal table for {event_label}: {e}",
             exc_info=True,
         )
         return pd.DataFrame()
@@ -165,8 +164,10 @@ def compute_championship_streaks(
     """
     Compute the longest streak of national championship titles per event.
     """
+    event_label = f"event {event}" if event else "all events"
+
     try:
-        logger.info(f"Computing championship win streaks{' for ' + event if event else ''}")
+        logger.info(f"Computing championship win streaks for {event_label}")
 
         results = db_tables["results_nationality"]
 
@@ -179,7 +180,7 @@ def compute_championship_streaks(
             champs = champs.query("event_id == @event")
 
         if champs.empty:
-            logger.warning(f"No championship results found{' for event ' + event if event else ''}.")
+            logger.warning(f"No championship results found for {event_label}.")
             return pd.DataFrame(columns=["event_id", "person_id", "person_name", "Consecutive Wins"])
 
         # --- Keep only winners (position 1) per competition+event ---
@@ -209,15 +210,13 @@ def compute_championship_streaks(
         max_streaks.index += 1
 
         logger.info(
-            f"Championship streaks computed ({len(max_streaks)} competitors)"
-            f"{' for event ' + event if event else ''}"
+            f"Championship streaks computed ({len(max_streaks)} competitors) for {event_label}"
         )
         return max_streaks[["event_id", "person_id", "person_name", "Consecutive Wins"]]
 
     except Exception as e:
         logger.error(
-            f"Error while computing championship streaks"
-            f"{' for event ' + event if event else ''}: {e}",
+            f"Error while computing championship streaks for {event_label}: {e}",
             exc_info=True,
         )
         return pd.DataFrame()
@@ -630,8 +629,10 @@ def compute_sweeps(
     nationality is the best-ranked national in ALL the required events at the
     SAME national championship competition.
     """
+    events_label = " + ".join(req_events)
+
     try:
-        logger.info(f"Computing sweep for events: {' + '.join(req_events)}")
+        logger.info(f"Computing sweep for events: {events_label}")
 
         results = db_tables["results_nationality"]
 
@@ -641,7 +642,7 @@ def compute_sweeps(
         ).copy()
 
         if subset.empty:
-            logger.warning("No results found for sweep computation.")
+            logger.warning(f"No results found for sweep computation ({events_label}).")
             return pd.DataFrame(columns=["year", "competition_id", "person_id", "person_name"])
 
         # Best-ranked competitor per competition & event
@@ -663,11 +664,11 @@ def compute_sweeps(
         sweeps = sweeps.sort_values(["year", "competition_id"]).reset_index(drop=True)
         sweeps.index += 1
 
-        logger.info(f"Found {len(sweeps)} sweeps")
+        logger.info(f"Found {len(sweeps)} sweeps for {events_label}")
         return sweeps[["year", "competition_id", "person_id", "person_name"]]
 
     except Exception as e:
-        logger.error(f"Error while computing sweeps: {e}", exc_info=True)
+        logger.error(f"Error while computing sweeps ({events_label}): {e}", exc_info=True)
         return pd.DataFrame()
 
 
