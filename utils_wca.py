@@ -239,6 +239,38 @@ def get_regions_dir(config: configparser.ConfigParser) -> Path:
     return reg_dir
 
 
+def get_current_persons(db_tables: dict, columns: list[str] | None = None) -> pd.DataFrame:
+    """
+    Return one row per WCA competitor with their CURRENT (most recent) attributes.
+
+    The WCA persons table stores nationality history: for each `wca_id`, the row
+    with `sub_id == 1` holds the latest data; `sub_id > 1` rows are historical
+    snapshots of past nationalities/names.
+
+    Parameters
+    ----------
+    db_tables : dict
+        Standard db_tables dict; must contain "persons".
+    columns : list[str], optional
+        Subset of columns to return. Defaults to ["wca_id", "name"].
+        Available columns: name, gender, wca_id, sub_id, country_id.
+
+    Returns
+    -------
+    pd.DataFrame
+        Deduplicated by wca_id, restricted to current-nationality rows.
+    """
+    if columns is None:
+        columns = ["wca_id", "name"]
+
+    return (
+        db_tables["persons"]
+        .loc[db_tables["persons"]["sub_id"] == 1, columns]
+        .drop_duplicates(subset="wca_id")
+        .reset_index(drop=True)
+    )
+
+
 def update_data(config: configparser.ConfigParser, logger: logging.Logger | None = None) -> None:
     """
     Download the latest WCA export if not already downloaded today.
@@ -742,15 +774,19 @@ def export_db_schema(
 
 def export_data(results: dict, figures: dict | None, section_name: str, config: configparser.ConfigParser, logger: logging.Logger | None = None) -> None:
     """
-    Export module results (Excel + optional figures) under a country-scoped
-    output directory:
+    Export module results (one CSV per entry + optional figures) under a
+    country-scoped output directory:
 
-        <output_dir>/<country>/<section_name>/<section_name>_<timestamp>.xlsx
+        <output_dir>/<country>/<section_name>/<entry_name>_<timestamp>.csv
         <output_dir>/<country>/<section_name>/<figures_subfolder>/<fig>_<timestamp>.png
 
     The country folder is derived from config.country (lowercased, spaces
     replaced with underscores). This keeps results from different countries
     cleanly separated when the pipeline is run for multiple configurations.
+
+    Each entry in `results` becomes its own CSV file (separator=';'). This
+    avoids Excel's 31-char sheet name limit and the impracticality of
+    producing dozens/hundreds of sheets in a single workbook.
     """
 
     # --- Timestamp ---
@@ -768,19 +804,21 @@ def export_data(results: dict, figures: dict | None, section_name: str, config: 
     module_dir = base_output_dir / country_tag / section_name
     module_dir.mkdir(parents=True, exist_ok=True)
 
-    # --- Excel ---
+    # --- CSVs (one per entry) ---
     try:
-        template = config["output"].get("excel_template", "{section_name}_{timestamp}.xlsx")
+        template = config["output"].get("csv_template", "{entry_name}_{timestamp}.csv")
     except KeyError:
-        template = "{section_name}_{timestamp}.xlsx"
+        template = "{entry_name}_{timestamp}.csv"
 
-    excel_file = module_dir / template.format(section_name=section_name, timestamp=timestamp)
-    with pd.ExcelWriter(excel_file, engine="openpyxl") as writer:
-        for sheet_name, df in results.items():
-            df.to_excel(writer, sheet_name=sheet_name[:31], index=False)
-
-    if logger:
-        logger.info(f"{section_name} results exported to Excel: {excel_file.resolve()}")
+    for entry_name, df in results.items():
+        if df is None:
+            continue
+        # Sanitize file name (avoid path separators / spaces)
+        safe_name = entry_name.replace("/", "_").replace("\\", "_").replace(" ", "_")
+        csv_file = module_dir / template.format(entry_name=safe_name, timestamp=timestamp)
+        df.to_csv(csv_file, index=False, sep=";", encoding="utf-8")
+        if logger:
+            logger.info(f"{section_name} | wrote CSV: {csv_file.resolve()}")
 
     # --- Figures ---
     if figures:
@@ -930,6 +968,34 @@ def multitime(x, logger=None):
         if logger:
             logger.warning(f"multitime() failed for {x}: {e}")
         return np.nan
+
+
+def format_result(value, event_id: str, logger=None) -> str:
+    """
+    Format a raw WCA result value according to event conventions:
+      - 333fm        → moves count, e.g. '24' (single) or '24.33' (average, stored *100)
+      - 333mbf       → encoded multi result, e.g. '47/50 37:15'
+      - everything   → time, e.g. '1:15.23'
+
+    Note: For FMC averages the WCA stores them *100; this helper assumes
+    `value` follows that convention. Pass single-attempt FMC values as-is.
+    """
+    try:
+        if pd.isna(value):
+            return ""
+        if event_id == "333mbf":
+            return multiresult(value, logger)
+        if event_id == "333fm":
+            # Heuristic: FMC averages are stored *100 (e.g. 2433 → 24.33).
+            # Single attempts are integers <= ~80.
+            if value > 200:
+                return f"{value / 100:.2f}"
+            return str(int(value))
+        return timeconvert(float(value))
+    except Exception as e:
+        if logger:
+            logger.warning(f"format_result() failed for value={value}, event={event_id}: {e}")
+        return str(value)
 
 
 def multiresult(x, logger=None):

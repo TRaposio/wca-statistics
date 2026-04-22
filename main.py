@@ -11,6 +11,7 @@ from modules import (
     championships,
     records,
     sor_kinch,
+    results,
 )
 
 
@@ -86,6 +87,8 @@ def main():
         records.run(db_tables, config)
     with timed(logger, "sor_kinch"):
         sor_kinch.run(db_tables, config)
+    with timed(logger, "results"):
+        results.run(db_tables, config)
 
     total_elapsed = time.perf_counter() - pipeline_start
     logger.info(f"Pipeline finished successfully in {total_elapsed:.1f}s total")
