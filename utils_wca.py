@@ -13,6 +13,28 @@ from cycler import cycler
 import traceback
 
 
+############ CONSTANTS ############
+
+# Shared WCA domain constants.
+# Use via e.g. uw.WCA_CONSTANTS['final_rounds'].
+# Inside pandas .query() rebind locally, because @name can't access dict subscripts:
+#     final_rounds = uw.WCA_CONSTANTS['final_rounds']
+#     df.query("round_type_id in @final_rounds")
+
+WCA_CONSTANTS = {
+    # Round type ids representing a final or combined-final.
+    'final_rounds': ('c', 'f'),
+
+    # Sentinel values for WCA result columns (best / average / attempt value).
+    # -1 = DNF, -2 = DNS, 0 = no attempt / not submitted.
+    'dnf': -1,
+    'dns': -2,
+    'no_attempt': 0,
+    'invalid_results': (0, -1, -2),
+}
+
+
+
 ############ LOGGER ############
 
 
@@ -146,6 +168,54 @@ def load_config(logger: logging.Logger, config_path: str | Path = "config.ini") 
 
 ############ PLOTS ############
 
+# Font families that cover CJK (Chinese/Japanese/Korean) glyphs.
+# Order: cross-platform Noto first, then common OS-bundled fallbacks
+# (macOS, Windows, Linux). matplotlib picks the first one that's
+# actually installed.
+
+_CJK_FONT_CANDIDATES = [
+    "Noto Sans CJK SC", "Noto Sans CJK JP", "Noto Sans CJK TC",
+    "PingFang SC", "Hiragino Sans GB", "Hiragino Sans",   # macOS
+    "Microsoft YaHei", "SimHei",                           # Windows
+    "WenQuanYi Zen Hei", "Source Han Sans SC",             # Linux
+    "Arial Unicode MS",                                    # older macOS catch-all
+]
+
+
+def _resolve_font_chain(configured: list[str], logger: logging.Logger | None = None) -> list[str]:
+    """
+    Build matplotlib's font fallback chain by combining the user-configured
+    fonts with any CJK-capable fonts actually installed on the system.
+
+    Configured fonts always come first (explicit control wins). CJK fonts
+    are only appended if they're found in matplotlib's font registry, to
+    avoid polluting the fallback chain with missing fonts.
+    """
+    from matplotlib import font_manager
+
+    installed = {f.name for f in font_manager.fontManager.ttflist}
+    detected_cjk = [f for f in _CJK_FONT_CANDIDATES if f in installed]
+
+    # Deduplicate while preserving order: configured first, then CJK.
+    seen = set()
+    chain = []
+    for f in configured + detected_cjk:
+        if f not in seen:
+            chain.append(f)
+            seen.add(f)
+
+    if logger:
+        if detected_cjk:
+            logger.info(f"CJK-capable fonts detected: {', '.join(detected_cjk)}")
+        else:
+            logger.warning(
+                "No CJK-capable fonts detected on this system. Non-Latin names "
+                "(e.g. Chinese/Japanese) will render as missing glyphs. "
+                "Install e.g. 'Noto Sans CJK' to fix."
+            )
+
+    return chain
+
 
 def set_plot_style(config: configparser.ConfigParser, logger: logging.Logger | None = None):
     """
@@ -159,12 +229,23 @@ def set_plot_style(config: configparser.ConfigParser, logger: logging.Logger | N
 
         # --- Parse figure size safely ---
         try:
-            fig_size = eval(cfg.get("figure_size", "(8, 5)"))
-        except Exception:
+            fig_size = tuple(
+                float(x.strip()) for x in cfg.get("figure_size", "8, 5").split(",")
+            )
+            if len(fig_size) != 2:
+                raise ValueError(f"expected 2 values, got {len(fig_size)}")
+        except Exception as e:
             fig_size = (8, 5)
             if logger:
-                logger.warning("Invalid 'figure_size' in config.ini, using default (8, 5)")
+                logger.warning(f"Invalid 'figure_size' in config.ini ({e}); using default (8, 5)")
 
+        
+        # --- Build font fallback list (config + auto-detected CJK) ---
+        configured_fonts = [
+            x.strip() for x in cfg.get("font_sans_serif", "DejaVu Sans").split(",") if x.strip()
+        ]
+        font_list = _resolve_font_chain(configured_fonts, logger)
+        
         # --- Update matplotlib rcParams ---
         plt.rcParams.update({
             # --- Figure ---
@@ -185,7 +266,7 @@ def set_plot_style(config: configparser.ConfigParser, logger: logging.Logger | N
 
             # --- Font ---
             "font.family": cfg.get("font_family", "sans-serif"),
-            "font.sans-serif": [x.strip() for x in cfg.get("font_sans_serif", "DejaVu Sans").split(",")],
+            "font.sans-serif": font_list,
             "font.size": cfg.getint("font_size", 11),
             "text.color": cfg.get("text_color", "black"),
 
@@ -841,6 +922,37 @@ def export_data(results: dict, figures: dict | None, section_name: str, config: 
 
 
 ############ Functions ############
+
+
+def drop_invalid_results(df: pd.DataFrame, cols: str | list[str] = "best") -> pd.DataFrame:
+    """
+    Mask WCA DNF/DNS/no-attempt sentinels as NaN in the given column(s) and
+    drop rows where all listed columns became NaN.
+
+    Use this when you want to keep rows for grouping/counting but exclude
+    invalid times from aggregations (e.g. best-of-event, averages, rankings).
+    For simple query-based filters prefer the idiomatic `.query("best > 0")`.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+    cols : str | list[str]
+        Column(s) to sanitize. Default "best". Pass e.g. ["best", "average"]
+        to drop rows invalid on both.
+
+    Returns
+    -------
+    pd.DataFrame
+        Copy with sentinels replaced by NaN in `cols` and rows entirely
+        invalid on `cols` dropped.
+    """
+    if isinstance(cols, str):
+        cols = [cols]
+
+    out = df.copy()
+    invalid = list(WCA_CONSTANTS['invalid_results'])
+    out[cols] = out[cols].replace(invalid, np.nan)
+    return out.dropna(subset=cols, how="all")
 
 
 def truncate(num: float, n: int) -> float:

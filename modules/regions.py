@@ -75,9 +75,6 @@ from shapely.geometry import Point
 # Constants
 # ---------------------------------------------------------------------------
 
-# Round types representing a final / combined-final.
-_FINAL_ROUND_TYPES = ("c", "f")
-
 # COUNTRY-SPECIFIC (A): the only country this module currently supports.
 # Compared case-insensitively against config.country.
 _SUPPORTED_COUNTRY = "italy"
@@ -196,10 +193,11 @@ def compute_average_win_times_by_region(
         region_map = db_tables["regions"].copy()
 
         # --- Filter for last N years ---
+        final_rounds = uw.WCA_CONSTANTS['final_rounds']
         latest_date = results["date"].max()
         cutoff = latest_date - pd.Timedelta(days=n_years * 365)
         df = results.query(
-            "date >= @cutoff & pos == 1 & round_type_id in @_FINAL_ROUND_TYPES & best > 0"
+            "date >= @cutoff & pos == 1 & round_type_id in @final_rounds & best > 0"
         ).copy()
         logger.info(f"Keeping results from {cutoff.date()} to {latest_date.date()}.")
 

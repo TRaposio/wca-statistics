@@ -13,9 +13,6 @@ import geopandas as gpd
 # Constants
 # ---------------------------------------------------------------------------
 
-# Round types representing a final / combined-final.
-_FINAL_ROUND_TYPES = ("c", "f")
-
 # Major international championship types in the WCA championships table.
 _WORLD_CHAMPIONSHIP_TYPE = "world"
 
@@ -38,13 +35,15 @@ def compute_national_championship_winners(
     """
     try:
         nationality = config.nationality
+        
         logger.info(f"Computing {event or 'all-event'} winners at {config.country} championships...")
 
         results_country = db_tables["results_country"].copy()
+        final_rounds = uw.WCA_CONSTANTS['final_rounds']
 
         # --- Filter for national finals/combined rounds ---
         champs = results_country.query(
-            "competition_id in @config.nats and round_type_id in @_FINAL_ROUND_TYPES "
+            "competition_id in @config.nats and round_type_id in @final_rounds "
             "and best > 0 and person_country_id == @nationality"
         )
 
@@ -110,9 +109,10 @@ def compute_national_championship_medal_table(
 
         results = db_tables["results_nationality"]
         persons = db_tables["persons"][["wca_id", "name"]].drop_duplicates()
+        final_rounds = uw.WCA_CONSTANTS['final_rounds']
 
         solve = results.query(
-            "round_type_id in @_FINAL_ROUND_TYPES and competition_id in @config.nats and best > 0"
+            "round_type_id in @final_rounds and competition_id in @config.nats and best > 0"
         ).copy()
 
         if event:
@@ -170,9 +170,10 @@ def compute_championship_streaks(
         logger.info(f"Computing championship win streaks for {event_label}")
 
         results = db_tables["results_nationality"]
+        final_rounds = uw.WCA_CONSTANTS['final_rounds']
 
         champs = results.query(
-            "competition_id in @config.nats and round_type_id in @_FINAL_ROUND_TYPES "
+            "competition_id in @config.nats and round_type_id in @final_rounds "
             "and best > 0 and person_country_id == @config.nationality"
         ).copy()
 
@@ -237,9 +238,10 @@ def compute_hall_of_fame(
 
         results = db_tables["results_nationality"]
         persons = db_tables["persons"][["wca_id", "name"]].drop_duplicates()
+        final_rounds = uw.WCA_CONSTANTS['final_rounds']
 
         champs = results.query(
-            "competition_id in @config.nats and round_type_id in @_FINAL_ROUND_TYPES "
+            "competition_id in @config.nats and round_type_id in @final_rounds "
             "and best > 0 and event_id == @event"
         ).copy()
 
@@ -330,6 +332,7 @@ def compute_international_podiums(
         # --- Precompute continent-eligible country IDs ---
         continent_country_ids = countries.query("continent_id == @cont_id")["id"].unique()
         target_country = config.nationality
+        final_rounds = uw.WCA_CONSTANTS['final_rounds']
 
         podiums_list = []
 
@@ -337,7 +340,7 @@ def compute_international_podiums(
             comp_ids = intl_champs.query("championship_type == @ctype")["competition_id"].unique()
 
             subset = results.query(
-                "competition_id in @comp_ids and round_type_id in @_FINAL_ROUND_TYPES and best > 0"
+                "competition_id in @comp_ids and round_type_id in @final_rounds and best > 0"
             ).copy()
 
             if subset.empty:
@@ -411,6 +414,7 @@ def compute_major_final_appearances(
         results = db_tables["results_nationality"]
         championships = db_tables["championships"]
         persons = db_tables["persons"][["wca_id", "name"]].drop_duplicates()
+        final_rounds = uw.WCA_CONSTANTS['final_rounds']
 
         target_types = [_WORLD_CHAMPIONSHIP_TYPE, cont_id]
         intl_champs = championships.query(
@@ -418,7 +422,7 @@ def compute_major_final_appearances(
         )["competition_id"].unique()
 
         subset = results.query(
-            "competition_id in @intl_champs and round_type_id in @_FINAL_ROUND_TYPES and best > 0"
+            "competition_id in @intl_champs and round_type_id in @final_rounds and best > 0"
         ).copy()
 
         if subset.empty:
@@ -470,9 +474,10 @@ def compute_national_final_appearances(
 
         results = db_tables["results_nationality"]
         persons = db_tables["persons"][["wca_id", "name"]].drop_duplicates()
+        final_rounds = uw.WCA_CONSTANTS['final_rounds']
 
         subset = results.query(
-            "competition_id in @config.nats and round_type_id in @_FINAL_ROUND_TYPES"
+            "competition_id in @config.nats and round_type_id in @final_rounds"
         ).copy()
 
         if subset.empty:
@@ -569,9 +574,10 @@ def compute_title_retention_rate(
         logger.info("Computing national title retention rate by event")
 
         results = db_tables["results_nationality"]
+        final_rounds = uw.WCA_CONSTANTS['final_rounds']
 
         subset = results.query(
-            "competition_id in @config.nats and round_type_id in @_FINAL_ROUND_TYPES and best > 0"
+            "competition_id in @config.nats and round_type_id in @final_rounds and best > 0"
         ).copy()
 
         if subset.empty:
@@ -635,9 +641,10 @@ def compute_sweeps(
         logger.info(f"Computing sweep for events: {events_label}")
 
         results = db_tables["results_nationality"]
+        final_rounds = uw.WCA_CONSTANTS['final_rounds']
 
         subset = results.query(
-            "competition_id in @config.nats and round_type_id in @_FINAL_ROUND_TYPES "
+            "competition_id in @config.nats and round_type_id in @final_rounds "
             "and best > 0 and event_id in @req_events"
         ).copy()
 

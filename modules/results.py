@@ -10,8 +10,6 @@ import utils_wca as uw
 # Constants
 # ---------------------------------------------------------------------------
 
-_FINAL_ROUND_TYPES = ("c", "f")
-_INVALID_VALUES = (0, -1, -2)
 _TOP_N = 100
 _MBLD_EVENT = "333mbf"
 _FMC_EVENT = "333fm"
@@ -78,9 +76,11 @@ def compute_medal_table(
         scope = f"year={year}" if year is not None else "all-time"
         logger.info(f"Computing medal table for {config.nationality} ({scope})")
 
+        final_rounds = uw.WCA_CONSTANTS['final_rounds']
+
         df = (
             db_tables["results_nationality"]
-            .query("round_type_id in @_FINAL_ROUND_TYPES and pos in [1, 2, 3] and best > 0")
+            .query("round_type_id in @final_rounds and pos in [1, 2, 3] and best > 0")
             .copy()
         )
 
@@ -308,10 +308,12 @@ def compute_best_podiums(
     try:
         logger.info(f"Computing best podiums for {event_id}")
 
+        final_rounds = uw.WCA_CONSTANTS['final_rounds']
+
         base = (
             db_tables["results_country"]
             .query(
-                "event_id == @event_id and round_type_id in @_FINAL_ROUND_TYPES "
+                "event_id == @event_id and round_type_id in @final_rounds "
                 "and pos in [1, 2, 3] and average > 0"
             )
             [["competition_id", "pos", "person_name", "average"]]

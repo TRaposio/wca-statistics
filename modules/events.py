@@ -9,14 +9,8 @@ import utils_wca as uw
 # Constants
 # ---------------------------------------------------------------------------
 
-# Round types representing a final / combined-final.
-_FINAL_ROUND_TYPES = ("c", "f")
-
 # MBLD event id — excluded from Silver Membership since it has no 'average'.
 _MBLD_EVENT = "333mbf"
-
-# Sentinels used by the WCA for DNF (-1) / DNS (-2) / no attempt (0)
-_INVALID_RESULT_VALUES = [0, -1, -2]
 
 
 ###################################################################
@@ -33,13 +27,15 @@ def compute_most_events_won(
     try:
         logger.info(f"Computing most events won for competitors from {config.nationality}...")
 
+        final_rounds = uw.WCA_CONSTANTS['final_rounds']
         results = db_tables["results_fixed"].copy()
         persons = db_tables["persons"][["wca_id", "name"]].drop_duplicates()
 
         golds = (
-            results.query("round_type_id in @_FINAL_ROUND_TYPES & pos == 1")
-            .replace(_INVALID_RESULT_VALUES, np.nan)
-            .dropna(subset=["best"])
+            uw.drop_invalid_results(
+                results.query("round_type_id in @final_rounds & pos == 1"),
+                "best",
+            )
             .groupby("person_id")["event_id"]
             .nunique()
             .rename("Different Events Won")
@@ -80,13 +76,15 @@ def compute_most_events_podiumed(
     try:
         logger.info(f"Computing most events podiumed for competitors from {config.nationality}...")
 
+        final_rounds = uw.WCA_CONSTANTS['final_rounds']
         results = db_tables["results_fixed"].copy()
         persons = db_tables["persons"][["wca_id", "name"]].drop_duplicates()
 
         podiums = (
-            results.query("round_type_id in @_FINAL_ROUND_TYPES & pos <= 3")
-            .replace(_INVALID_RESULT_VALUES, np.nan)
-            .dropna(subset=["best"])
+            uw.drop_invalid_results(
+                results.query("round_type_id in @final_rounds & pos <= 3"),
+                "best",
+            )
             .groupby("person_id")["event_id"]
             .nunique()
             .rename("Different Events Podiumed")
