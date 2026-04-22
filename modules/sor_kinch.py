@@ -109,7 +109,8 @@ def _compute_sor(
         return sor
 
     except Exception as e:
-        logger.critical(f"Error while computing Sum of Ranks ({label}): {e}", exc_info=True)
+        logger.error(f"Error while computing Sum of Ranks ({label}): {e}", exc_info=True)
+        return pd.DataFrame()
 
 
 ###################################################################
@@ -195,7 +196,8 @@ def compute_country_kinch_score(db_tables: dict, config, logger) -> pd.DataFrame
         return result
 
     except Exception as e:
-        logger.critical(f"Error while computing Country Kinch scores: {e}", exc_info=True)
+        logger.error(f"Error while computing Country Kinch scores: {e}", exc_info=True)
+        return pd.DataFrame()
 
 
 def _compute_kinch_person(
@@ -249,7 +251,8 @@ def _compute_kinch_person(
         return result
 
     except Exception as e:
-        logger.critical(f"Error computing {kind}-level Kinch scores: {e}", exc_info=True)
+        logger.error(f"Error computing {kind}-level Kinch scores: {e}", exc_info=True)
+        return pd.DataFrame()
 
 
 # ---------------------------------------------------------------------------
@@ -455,7 +458,8 @@ def _plot_kinch_lines(
         return fig
  
     except Exception as e:
-        logger.critical(f"Error creating Kinch line plot '{title}': {e}", exc_info=True)
+        logger.error(f"Error creating Kinch line plot '{title}': {e}", exc_info=True)
+        return None
  
  
 def _kinch_plot_suite(
@@ -574,16 +578,17 @@ def plot_country_kinch_vs_size(
     highlights the configured home country, and labels outliers (points
     farthest from the trend).
 
-    Optional [plot] config keys:
+    Optional [sor_kinch] config keys:
         country_kinch_min_competitors   (default 25)
-        country_kinch_outlier_percentile (default 95)
+        country_kinch_outlier_percentile (default 90)
     """
     try:
         logger.info("Creating Country Kinch vs country size scatterplot")
 
         # --- Tunables (with defaults matching the original script) ---
-        min_competitors = int(config["plot"].get("country_kinch_min_competitors", 25))
-        outlier_pct = float(config["plot"].get("country_kinch_outlier_percentile", 95))
+        sor_cfg = config["sor_kinch"] if config.has_section("sor_kinch") else {}
+        min_competitors = int(sor_cfg.get("country_kinch_min_competitors", 25))
+        outlier_pct = float(sor_cfg.get("country_kinch_outlier_percentile", 95))
 
         # --- Country size = number of distinct competitors (current nationality) ---
         persons = db_tables["persons"]
@@ -676,7 +681,8 @@ def plot_country_kinch_vs_size(
         return fig
 
     except Exception as e:
-        logger.critical(f"Error creating Country Kinch vs size scatterplot: {e}", exc_info=True)
+        logger.error(f"Error creating Country Kinch vs size scatterplot: {e}", exc_info=True)
+        return None
 
 
 ###################################################################

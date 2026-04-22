@@ -741,13 +741,21 @@ def export_db_schema(
 
 def export_data(results: dict, figures: dict | None, section_name: str, config: configparser.ConfigParser, logger: logging.Logger | None = None) -> None:
     """
-    Export module results: Excel + optional figures.
+    Export module results (Excel + optional figures) under a country-scoped
+    output directory:
+
+        <output_dir>/<country>/<section_name>/<section_name>_<timestamp>.xlsx
+        <output_dir>/<country>/<section_name>/<figures_subfolder>/<fig>_<timestamp>.png
+
+    The country folder is derived from config.country (lowercased, spaces
+    replaced with underscores). This keeps results from different countries
+    cleanly separated when the pipeline is run for multiple configurations.
     """
 
     # --- Timestamp ---
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
 
-    # --- Output folder ---
+    # --- Output folder (country-scoped) ---
     try:
         base_output_dir = Path(config["paths"]["output_dir"])
     except KeyError:
@@ -755,7 +763,8 @@ def export_data(results: dict, figures: dict | None, section_name: str, config: 
         if logger:
             logger.warning("Missing [paths]->output_dir in config.ini. Using './output'.")
 
-    module_dir = base_output_dir / section_name
+    country_tag = config.country.lower().replace(" ", "_")
+    module_dir = base_output_dir / country_tag / section_name
     module_dir.mkdir(parents=True, exist_ok=True)
 
     # --- Excel ---
@@ -783,6 +792,8 @@ def export_data(results: dict, figures: dict | None, section_name: str, config: 
         fig_dir.mkdir(exist_ok=True)
 
         for fig_name, fig in figures.items():
+            if fig is None:
+                continue
             fig_path = fig_dir / f"{fig_name}_{timestamp}.png"
             fig.savefig(fig_path)
             plt.close(fig)
