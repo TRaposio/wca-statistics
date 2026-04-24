@@ -10,7 +10,7 @@ from modules import (
     relays,
     championships,
     records,
-    sor_kinch,
+    rankings,
     results,
 )
 
@@ -85,8 +85,8 @@ def main():
         relays.run(db_tables, config)
     with timed(logger, "records"):
         records.run(db_tables, config)
-    with timed(logger, "sor_kinch"):
-        sor_kinch.run(db_tables, config)
+    with timed(logger, "rankings"):
+        rankings.run(db_tables, config)
     with timed(logger, "results"):
         results.run(db_tables, config)
 

@@ -31,8 +31,18 @@ WCA_CONSTANTS = {
     'dns': -2,
     'no_attempt': 0,
     'invalid_results': (0, -1, -2),
-}
 
+    # Kinch Rank event partitioning.
+    # Defines which result type counts toward each event's Kinch score.
+    # Source: https://www.speedsolving.com/threads/all-round-rankings-kinchranks.53353/
+    'kinch_average_events': (
+        '222', '333', '444', '555', '666', '777',
+        '333oh', '333ft', 'minx', 'pyram', 'sq1', 'clock', 'skewb',
+    ),
+    'kinch_single_only_events': ('444bf', '555bf'),
+    'kinch_best_of_both_events': ('333bf', '333fm'),
+    'kinch_mbld_event': '333mbf',
+}
 
 
 ############ LOGGER ############

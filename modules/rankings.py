@@ -10,22 +10,24 @@ import utils_wca as uw
 # Constants
 # ---------------------------------------------------------------------------
 
-# Events that use Average, Single, or best-of-both for Kinch
-_KINCH_AVERAGE_EVENTS = [
-    "333", "444", "555", "222", "333oh", "333ft", "minx",
-    "pyram", "sq1", "clock", "skewb", "666", "777"
-]
-_KINCH_SINGLE_ONLY_EVENTS = ["444bf", "555bf"]         # singles only (excl. mbld)
-_KINCH_BEST_OF_BOTH_EVENTS = ["333bf", "333fm"]        # best ratio of avg vs single
-_KINCH_MBLD_EVENT = "333mbf"
+_KINCH_MBLD_EVENT = uw.WCA_CONSTANTS['kinch_mbld_event']
 
-_ALL_KINCH_EVENTS = (
-    _KINCH_AVERAGE_EVENTS
-    + _KINCH_SINGLE_ONLY_EVENTS
-    + _KINCH_BEST_OF_BOTH_EVENTS
-    + [_KINCH_MBLD_EVENT]
+_KINCH_AVG_EVENTS_SET = (
+    set(uw.WCA_CONSTANTS['kinch_average_events'])
+    | set(uw.WCA_CONSTANTS['kinch_best_of_both_events'])
 )
-_N_KINCH_EVENTS = len(_ALL_KINCH_EVENTS)   # 18
+_KINCH_SINGLE_EVENTS_SET = (
+    set(uw.WCA_CONSTANTS['kinch_single_only_events'])
+    | set(uw.WCA_CONSTANTS['kinch_best_of_both_events'])
+)
+
+_ALL_KINCH_EVENTS = list(
+       uw.WCA_CONSTANTS['kinch_average_events']
+       + uw.WCA_CONSTANTS['kinch_single_only_events']
+       + uw.WCA_CONSTANTS['kinch_best_of_both_events']
+       + (uw.WCA_CONSTANTS['kinch_mbld_event'],)
+   )
+_N_KINCH_EVENTS = len(_ALL_KINCH_EVENTS)
 
 
 ###################################################################
@@ -284,16 +286,14 @@ def _compute_kinch_event_scores(
     Only (entity, event) pairs that actually have a result are returned.
     The "score 0 for missing events" logic is handled by _finalize_kinch_ranking.
     """
-    avg_events_set = set(_KINCH_AVERAGE_EVENTS) | set(_KINCH_BEST_OF_BOTH_EVENTS)
-    sngl_events_set = set(_KINCH_SINGLE_ONLY_EVENTS) | set(_KINCH_BEST_OF_BOTH_EVENTS)
 
     avg_long = (
-        ranks_average[ranks_average["event_id"].isin(avg_events_set)]
+        ranks_average[ranks_average["event_id"].isin(_KINCH_AVG_EVENTS_SET)]
         .groupby([id_col, "event_id"], as_index=False)["best"].min()
         .assign(mode="average")
     )
     sngl_long = (
-        ranks_single[ranks_single["event_id"].isin(sngl_events_set)]
+        ranks_single[ranks_single["event_id"].isin(_KINCH_SINGLE_EVENTS_SET)]
         .groupby([id_col, "event_id"], as_index=False)["best"].min()
         .assign(mode="single")
     )
@@ -578,7 +578,7 @@ def plot_country_kinch_vs_size(
     highlights the configured home country, and labels outliers (points
     farthest from the trend).
 
-    Optional [sor_kinch] config keys:
+    Optional [rankings] config keys:
         country_kinch_min_competitors   (default 25)
         country_kinch_outlier_percentile (default 90)
     """
@@ -586,9 +586,9 @@ def plot_country_kinch_vs_size(
         logger.info("Creating Country Kinch vs country size scatterplot")
 
         # --- Tunables (with defaults matching the original script) ---
-        sor_cfg = config["sor_kinch"] if config.has_section("sor_kinch") else {}
-        min_competitors = int(sor_cfg.get("country_kinch_min_competitors", 25))
-        outlier_pct = float(sor_cfg.get("country_kinch_outlier_percentile", 95))
+        rankings_cfg = config["rankings"] if config.has_section("rankings") else {}
+        min_competitors = int(rankings_cfg.get("country_kinch_min_competitors", 25))
+        outlier_pct = float(rankings_cfg.get("country_kinch_outlier_percentile", 95))
 
         # --- Country size = number of distinct competitors (current nationality) ---
         persons = db_tables["persons"]
@@ -693,7 +693,7 @@ def plot_country_kinch_vs_size(
 def run(db_tables, config):
  
     logger = logging.getLogger(__name__)
-    logger.info("Producing stats for SOR & Kinch module")
+    logger.info("Producing stats for Rankings module")
  
     # --- Tables ---
     kinch_world = compute_kinch_score(db_tables=db_tables, config=config, logger=logger)
