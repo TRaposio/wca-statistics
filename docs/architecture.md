@@ -92,16 +92,6 @@ Use a launch configuration instead. Create `.vscode/launch.json`
 wca_stats.main`. F5 launches it; breakpoints work normally.
 `justMyCode: false` lets you step into pandas / matplotlib if needed.
 
-```
-output/<country_tag>/<module_name>/
-├── <entry_name>_<timestamp>.csv     # one CSV per result entry
-└── figures/
-    └── <fig_name>_<timestamp>.png   # if any
-```
-
-The `<country_tag>` is derived from `config.country` (lowercased,
-spaces → underscores).
-
 ## Repository layout
 
 ```
