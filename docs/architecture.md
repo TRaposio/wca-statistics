@@ -6,8 +6,7 @@ A Python pipeline that ingests the WCA results database export
 (TSV files) into pandas DataFrames and produces per-module statistics as
 CSVs and figures. No database engine — everything runs in memory.
 
-Future scope: a static/interactive website driven by the exported CSVs,
-and a RAG chatbot on the WCA regulations.
+Future scope: a static/interactive website driven by the exported CSVs
 
 ## Pipeline flow
 
