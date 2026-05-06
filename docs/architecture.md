@@ -124,7 +124,7 @@ wca-stats/
 │           ├── relays.py
 │           └── results.py
 ├── sql/                             # ad-hoc SQL probes (reference only)
-└── tests/                           # pytest scaffold (Phase 7)
+└── tests/                           # pytest scaffold
 ```
 
 ## `db_tables` keys

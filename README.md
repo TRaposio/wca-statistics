@@ -18,7 +18,7 @@ environment for all. All the official times achieved at competitions are posted
 on leaderboards and are publicly available at any time.
 
 If you want to download the WCA database, you can find it
-[here](https://www.worldcubeassociation.org/export/results.
+[here](https://www.worldcubeassociation.org/export/results).
 
 ## Examples
 
