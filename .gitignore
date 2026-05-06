@@ -1,48 +1,45 @@
-# Ignore Python cache and environment files
+# Python
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
+*.py[cod]
 *.egg-info/
 *.egg
-env/
-venv/
-ENV/
-*.env
 
-# Ignore logs and outputs
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+.env
+
+# Build / install
+build/
+dist/
+
+# Project outputs
 logs/
 output/
 
-# Ignore input data
+# Input data (not redistributable)
 data/database_export/
 data/Italy_shapefile/
-data/Limiti01012022/Com01012022/
-data/Limiti01012022/ProvCM01012022/
-data/Limiti01012022/RipGeo01012022/
+data/Limiti01012022/
 
-# Ignore Jupyter notebooks folder
-notebooks/
+# Aux files (manually maintained, kept local)
+data/regions/missing_region_mappings_ita.csv
 
-# Ignore system files
+# OS
 .DS_Store
 Thumbs.db
 
-# Ignore temporary files
-*.tmp
+# Editors
+.vscode/
+.idea/
+*.code-workspace
 *.swp
+*.tmp
 *.bak
 
-# Ignore workspace files
-*.code-workspace
-*.vscode
-
-# Ignore backup files
+# Local-only working files
+old_code/
 readme_backup.txt
-
-# Aux Files
-data/regions/missing_region_mappings_ita.csv
-
-# Temporary ignore
-misc/
 todo.txt
