@@ -13,6 +13,8 @@ from cycler import cycler
 import traceback
 
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
 ############ CONSTANTS ############
 
 # Shared WCA domain constants.
@@ -129,12 +131,14 @@ def load_config(logger: logging.Logger, config_path: str | Path = "config.ini") 
     """
     Import the config file and attach commonly-used attributes to it.
 
+    Paths in the [paths] section are resolved relative to the repo root,
+    not the current working directory, so the pipeline can be invoked
+    from anywhere.
+
     Attributes set here (available immediately after this call):
         config.current_events, config.multivenue : list[str]
-        config.year                              : int
         config.country, config.nationality       : str   (must match countries.tsv `name`)
         config.championship_type                 : str   (e.g. "IT", "US")
-        config.figure_size, config.dpi           : plot defaults
 
     Attributes set later by `process_tables` (require db_tables to be loaded):
         config.continent_id            : str   (e.g. "_Europe", "_Asia") — derived from countries
@@ -143,35 +147,27 @@ def load_config(logger: logging.Logger, config_path: str | Path = "config.ini") 
         config.countries, config.real_countries : list[str]
     """
 
+    config_path = REPO_ROOT / config_path
     logger.info(f"Gathering info from config {config_path}")
 
     config = configparser.ConfigParser()
     config.read(config_path)
 
-    # Lettura variabili globali
-    current_events = [
+    # Resolve [paths] entries against repo root so the pipeline is CWD-independent
+    if config.has_section("paths"):
+        for key, val in config["paths"].items():
+            config["paths"][key] = str((REPO_ROOT / val).resolve())
+
+    # Global variables
+    config.current_events = [
         x.strip() for x in config["global_variables"]["current_events"].split(",")
     ]
-    multivenue = [
+    config.multivenue = [
         x.strip() for x in config["global_variables"]["multivenue"].split(",")
     ]
-
-    config.current_events = current_events
-    config.multivenue = multivenue
-    config.year = int(config["global_variables"]["year"])
     config.country = config["global_variables"]["country"]
     config.nationality = config["global_variables"]["nationality"]
     config.championship_type = config["global_variables"]["championship_type"]
-
-    if config.has_section("plot"):
-        fig_size = tuple(
-            float(x.strip()) for x in config["plot"]["figure_size"].split(",")
-        )
-        config.figure_size = fig_size
-        config.dpi = int(config["plot"]["dpi"])
-    else:
-        config.figure_size = (12, 6)
-        config.dpi = 100
 
     return config
 
@@ -840,7 +836,7 @@ def export_db_schema(
 
     # Ensure directory exists
     output_dir.mkdir(parents=True, exist_ok=True)
-    output_file = output_dir / "db_schema.txt"
+    output_file = output_dir / "db_schema_generated.txt"
 
     if logger:
         logger.info("Starting schema export...")
