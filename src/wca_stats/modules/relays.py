@@ -39,6 +39,10 @@ def _compute_relay_base(
     Compute a relay-style leaderboard using pre-filtered national ranks
     (ranks_single_nationality).
 
+    Inclusion rule: a competitor must have a recorded single in every event
+    in `event_list` to appear. Competitors missing any event are dropped.
+    If no competitor has all events, returns an empty DataFrame.
+
     Adds per-event times, total summed score, and consistency metrics
     (Best Rank, Median Rank).
     """
@@ -64,9 +68,17 @@ def _compute_relay_base(
             .reindex(columns=event_list)
         )
 
-        # --- Fill missing times/ranks with worst + 1 (WCA convention) ---
-        pivot_best = pivot_best.apply(lambda c: c.fillna(c.max() + 1))
-        pivot_rank = pivot_rank.fillna(pivot_rank.max().max() + 1)
+        # --- Strict inclusion: drop competitors missing any required event ---
+        complete = pivot_best.dropna().index
+        pivot_best = pivot_best.loc[complete]
+        pivot_rank = pivot_rank.loc[complete]
+
+        if pivot_best.empty:
+            logger.warning(
+                f"{relay_name}: no competitor has a recorded single in all "
+                f"required events ({event_list})."
+            )
+            return pd.DataFrame()
 
         # --- Consistency metrics ---
         consistency = pd.DataFrame({

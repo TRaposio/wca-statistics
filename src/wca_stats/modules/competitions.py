@@ -252,6 +252,7 @@ def compute_newcomer_statistics(
             .groupby(["year", "gender"], observed=True)["person_id"]
             .nunique()
             .unstack(fill_value=0)
+            .reindex(columns=["f", "m", "o"], fill_value=0)
             .rename_axis(None, axis=1)
             .reset_index()
             .rename(columns={"f": "Newcomer F", "m": "Newcomer M", "o": "Newcomer O"})
@@ -262,6 +263,7 @@ def compute_newcomer_statistics(
             df_n.groupby(["year", "gender"], observed=True)["person_id"]
             .nunique()
             .unstack(fill_value=0)
+            .reindex(columns=["f", "m", "o"], fill_value=0)
             .rename_axis(None, axis=1)
             .reset_index()
             .rename(columns={"f": "Competitors F", "m": "Competitors M", "o": "Competitors O"})

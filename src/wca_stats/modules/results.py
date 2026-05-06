@@ -324,7 +324,11 @@ def compute_best_podiums(
             logger.warning(f"No valid podiums for event {event_id}.")
             return pd.DataFrame()
 
-        # Pivot: one row per competition with First/Second/Third columns
+        # Pivot: one row per competition with First/Second/Third columns.
+        # Reindex to guarantee positions 1, 2, 3 exist even if no row in
+        # `base` populated one of them — otherwise wide[("person_name", 3)]
+        # below crashes with KeyError when no competition has a 3rd-place
+        # finisher (e.g. small/new events).
         wide = (
             base.pivot_table(
                 index="competition_id",
@@ -332,6 +336,9 @@ def compute_best_podiums(
                 values=["person_name", "average"],
                 aggfunc="first",
             )
+            .reindex(columns=pd.MultiIndex.from_product(
+                [["person_name", "average"], [1, 2, 3]]
+            ))
         )
         # Keep only competitions with all three positions populated
         wide = wide.dropna()
