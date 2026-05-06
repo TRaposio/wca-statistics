@@ -62,7 +62,7 @@ import pandas as pd
 import numpy as np
 import logging
 import configparser
-import utils_wca as uw
+from wca_stats import utils_wca as uw
 import matplotlib.pyplot as plt
 import geopandas as gpd
 from matplotlib.colors import LinearSegmentedColormap

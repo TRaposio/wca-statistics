@@ -2,6 +2,16 @@
 
 This project is currently under development. Most analysis modules are not yet implemented, but the **SQL queries** contained in the `sql/` folder are fully ready to use against the database.
 
+Setup (conda — recommended for geopandas)
+    conda env create -f environment.yml
+    conda activate wca-stats
+    pip install -e .
+
+Setup (pip — works if geopandas installs cleanly on your system)
+    python -m venv .venv
+    source .venv/bin/activate
+    pip install -e ".[dev]"
+
 ## Repository Structure
 
 - `modules/` - Python modules for different kinds of statistics (in progress)

@@ -2,8 +2,8 @@
 import time
 from contextlib import contextmanager
 
-import utils_wca as uw
-from modules import (
+from wca_stats import utils_wca as uw
+from wca_stats.modules import (
     competitions,
     events,
     regions,

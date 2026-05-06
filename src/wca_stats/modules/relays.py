@@ -1,7 +1,7 @@
 import pandas as pd
 import logging
 import configparser
-import utils_wca as uw
+from wca_stats import utils_wca as uw
 
 
 # ---------------------------------------------------------------------------

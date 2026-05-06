@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wca-stats"
+version = "0.1.0"
+description = "Statistics pipeline over the WCA results database export"
+requires-python = ">=3.10"
+dependencies = [
+    "pandas>=2.0",
+    "numpy>=1.24",
+    "matplotlib>=3.7",
+    "cycler>=0.12",
+    "geopandas>=0.14",
+    "shapely>=2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]

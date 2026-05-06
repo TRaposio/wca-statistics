@@ -3,7 +3,7 @@ import numpy as np
 import logging
 import configparser
 import matplotlib.pyplot as plt
-import utils_wca as uw
+from wca_stats import utils_wca as uw
 
 
 # ---------------------------------------------------------------------------
